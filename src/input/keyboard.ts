@@ -12,12 +12,12 @@ export function attachKeyboard(game: Game): void {
       case "arrowright": game.tryMove(1, 0); break;
       case "arrowup": game.tryMove(0, -1); break;
       case "arrowdown": game.tryMove(0, 1); break;
-      case "i": game.tryRotate("x", 1); break;
-      case "k": game.tryRotate("x", -1); break;
-      case "j": game.tryRotate("y", 1); break;
-      case "l": game.tryRotate("y", -1); break;
-      case "u": game.tryRotate("z", 1); break;
-      case "o": game.tryRotate("z", -1); break;
+      case "q": game.tryRotate("x", 1); break;
+      case "w": game.tryRotate("x", -1); break;
+      case "a": game.tryRotate("y", 1); break;
+      case "s": game.tryRotate("y", -1); break;
+      case "z": game.tryRotate("z", 1); break;
+      case "x": game.tryRotate("z", -1); break;
       case " ": if (!e.repeat) game.hardDrop(); break;
       case "shift": game.softDropping = true; break;
       default: used = false;

@@ -13,14 +13,18 @@ import { Axis, IVec3, rotate } from "./vec";
 const { w, d, h } = WELL;
 
 // Wall-kick candidates tried (in order) when a rotation would otherwise
-// collide — nudge sideways or up a little before giving up.
+// collide. Sideways nudges first, then drop the piece down — this is what
+// lets horizontal-axis rotations succeed right at the top of the well, where
+// the rotated cells would otherwise poke through the ceiling.
 const KICKS: IVec3[] = [
   { x: 0, y: 0, z: 0 },
   { x: 1, y: 0, z: 0 },
   { x: -1, y: 0, z: 0 },
   { x: 0, y: 0, z: 1 },
   { x: 0, y: 0, z: -1 },
-  { x: 0, y: 1, z: 0 },
+  { x: 0, y: -1, z: 0 },
+  { x: 0, y: -2, z: 0 },
+  { x: 0, y: -3, z: 0 },
 ];
 
 export class Game {

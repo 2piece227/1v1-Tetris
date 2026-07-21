@@ -56,6 +56,9 @@ export class Renderer {
       this.scene
     );
     this.camera.attachControl(canvas, true);
+    // Arrow keys must control the piece, not orbit the camera — drop the
+    // camera's built-in keyboard input. Mouse drag still orbits (desktop only).
+    this.camera.inputs.removeByType("ArcRotateCameraKeyboardMoveInput");
     this.camera.lowerRadiusLimit = 1.2;
     this.camera.upperRadiusLimit = 6;
     this.camera.wheelPrecision = 40;
