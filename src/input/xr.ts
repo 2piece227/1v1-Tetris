@@ -3,6 +3,7 @@ import {
   WebXRState,
   type WebXRInputSource,
 } from "@babylonjs/core";
+import type { Sfx } from "../audio/sfx";
 import type { Game } from "../game/game";
 import type { Renderer } from "../render/renderer";
 
@@ -33,7 +34,8 @@ const SQUEEZE = "xr-standard-squeeze";
 
 export async function setupXR(
   game: Game,
-  renderer: Renderer
+  renderer: Renderer,
+  sfx: Sfx
 ): Promise<WebXRDefaultExperience | null> {
   let xr: WebXRDefaultExperience;
   try {
@@ -45,9 +47,22 @@ export async function setupXR(
   }
   if (!xr.baseExperience) return null;
 
+  // Drop the tank an arm's length in front of wherever the player is actually
+  // standing. Also bound to the left X button, because at a festival the next
+  // person in line will be standing somewhere else entirely.
+  const recenter = (): void => {
+    const cam = xr.baseExperience.camera;
+    renderer.placeForXR(cam.position.clone(), cam.getForwardRay().direction.clone());
+  };
+
   xr.baseExperience.onStateChangedObservable.add((state) => {
-    if (state === WebXRState.IN_XR) renderer.placeForXR();
-    else if (state === WebXRState.NOT_IN_XR) renderer.placeForDesktop();
+    if (state === WebXRState.IN_XR) {
+      sfx.unlock(); // entering VR is the user gesture WebAudio needs
+      // The head pose is not usable on the session's first frame.
+      renderer.scene.onAfterRenderObservable.addOnce(() => recenter());
+    } else if (state === WebXRState.NOT_IN_XR) {
+      renderer.placeForDesktop();
+    }
   });
 
   // Per-hand analog stick steppers.
@@ -91,6 +106,10 @@ export async function setupXR(
         };
         squeeze?.onButtonStateChangedObservable.add(setSoft);
         trigger?.onButtonStateChangedObservable.add(setSoft);
+        // left X → re-plant the tank in front of me
+        mc.getComponent("x-button")?.onButtonStateChangedObservable.add((c) => {
+          if (c.pressed) recenter();
+        });
       }
     });
   });

@@ -2,6 +2,7 @@ import {
   BASE_DROP_MS,
   LAYERS_PER_LEVEL,
   LAYER_SCORE,
+  LEVEL_SPEEDUP_MS,
   MIN_DROP_MS,
   SOFT_DROP_MS,
   WELL,
@@ -49,21 +50,43 @@ export class Game {
   onClear: ((n: number) => void) | null = null;
   /** Fired once when the game ends. */
   onGameOver: (() => void) | null = null;
+  /** Fired on a successful sideways move (for sound). */
+  onMove: (() => void) | null = null;
+  /** Fired on a successful rotation (for sound). */
+  onRotate: (() => void) | null = null;
+  /** Fired when a piece settles into the stack (for sound). */
+  onLock: (() => void) | null = null;
 
   constructor() {
     this.spawn();
   }
 
   private dropInterval(): number {
-    return Math.max(MIN_DROP_MS, BASE_DROP_MS - (this.level - 1) * 90);
+    return Math.max(MIN_DROP_MS, BASE_DROP_MS - (this.level - 1) * LEVEL_SPEEDUP_MS);
   }
 
   private spawn(): void {
     this.current = this.next;
     this.next = randomPiece();
     this.cells = this.current.cells.map((c) => ({ ...c }));
+
+    // Centre the piece's own bounding box in the well rather than parking the
+    // pivot at the midpoint. Offsets are not symmetric around the pivot (I runs
+    // -1..+2), so a fixed pivot pushes the long pieces through the wall and
+    // ends the game on spawn as soon as the well is no wider than the piece.
+    const span = (sel: (c: IVec3) => number): [number, number] => {
+      const vals = this.cells.map(sel);
+      return [Math.min(...vals), Math.max(...vals)];
+    };
+    const [minX, maxX] = span((c) => c.x);
+    const [minZ, maxZ] = span((c) => c.z);
     const maxY = Math.max(...this.cells.map((c) => c.y));
-    this.pos = { x: (w / 2) | 0, y: h - 1 - maxY, z: (d / 2) | 0 };
+
+    this.pos = {
+      x: Math.floor((w - (maxX - minX + 1)) / 2) - minX,
+      y: h - 1 - maxY,
+      z: Math.floor((d - (maxZ - minZ + 1)) / 2) - minZ,
+    };
     this.dropTimer = 0;
     if (!this.grid.canPlace(this.cells, this.pos)) {
       this.gameOver = true;
@@ -77,6 +100,7 @@ export class Game {
     const np = { x: this.pos.x + dx, y: this.pos.y, z: this.pos.z + dz };
     if (this.grid.canPlace(this.cells, np)) {
       this.pos = np;
+      this.onMove?.();
       this.onChange?.();
       return true;
     }
@@ -91,6 +115,7 @@ export class Game {
       if (this.grid.canPlace(rotated, np)) {
         this.cells = rotated;
         this.pos = np;
+        this.onRotate?.();
         this.onChange?.();
         return true;
       }
@@ -118,6 +143,7 @@ export class Game {
 
   private lock(): void {
     this.grid.lock(this.cells, this.pos, this.current.color);
+    this.onLock?.();
     const n = this.grid.clearFullLayers();
     if (n > 0) {
       this.score += (LAYER_SCORE[Math.min(n, LAYER_SCORE.length - 1)] ?? 0) * this.level;

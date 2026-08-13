@@ -1,10 +1,12 @@
+import type { Sfx } from "../audio/sfx";
 import type { Game } from "../game/game";
 
 // Desktop controls — also the fastest way to test without a headset.
 // Keyed off `event.key` (always populated) rather than `event.code`, so it
 // works across layouts and with synthetic events.
-export function attachKeyboard(game: Game): void {
+export function attachKeyboard(game: Game, sfx: Sfx): void {
   window.addEventListener("keydown", (e) => {
+    sfx.unlock(); // first keypress is the user gesture WebAudio waits for
     const k = e.key.toLowerCase();
     let used = true;
     switch (k) {

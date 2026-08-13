@@ -9,14 +9,10 @@
       html, body { width: 100%; height: 100%; overflow: hidden; background: #05060a; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
       #renderCanvas { width: 100%; height: 100%; display: block; touch-action: none; outline: none; }
 
-      #hud {
-        position: fixed; top: 16px; left: 16px; color: #e8ecff;
-        text-shadow: 0 1px 3px rgba(0,0,0,0.8); pointer-events: none; user-select: none;
-        font-variant-numeric: tabular-nums;
-      }
-      #hud .score { font-size: 34px; font-weight: 700; letter-spacing: 0.5px; }
-      #hud .sub { font-size: 14px; opacity: 0.75; margin-top: 2px; }
-
+      /* Score and game-over now live in the 3D scene (src/render/vrui.ts) so
+         they survive entering VR, where the DOM is not presented at all.
+         What stays here is desktop-only by nature — invisible in the headset,
+         which is exactly where the keyboard legend belongs. */
       #help {
         position: fixed; bottom: 16px; left: 16px; color: #aeb6d8; font-size: 12.5px;
         line-height: 1.6; background: rgba(10,14,28,0.55); padding: 12px 14px; border-radius: 10px;
@@ -28,39 +24,15 @@
         font-family: inherit; font-size: 11.5px; color: #cdd5ff;
       }
 
-      #overlay {
-        position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
-        flex-direction: column; gap: 18px; background: rgba(4,6,12,0.72); color: #fff; text-align: center;
-        backdrop-filter: blur(3px);
-      }
-      #overlay.show { display: flex; }
-      #overlay h1 { font-size: 42px; font-weight: 800; letter-spacing: 1px; }
-      #overlay p { font-size: 16px; opacity: 0.8; }
-      #overlay button {
-        margin-top: 6px; font-size: 17px; font-weight: 600; color: #05060a; background: #7c8bff;
-        border: none; border-radius: 10px; padding: 12px 28px; cursor: pointer; pointer-events: auto;
-      }
-      #overlay button:hover { background: #93a0ff; }
     </style>
   </head>
   <body>
     <canvas id="renderCanvas"></canvas>
 
-    <div id="hud">
-      <div class="score">0</div>
-      <div class="sub">레이어 0 · 레벨 1</div>
-    </div>
-
     <div id="help">
       <b>이동</b> <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> &nbsp; <b>낙하</b> <kbd>Space</kbd> / <kbd>Shift</kbd><br />
       <b>회전 X</b> <kbd>Q</kbd><kbd>W</kbd> &nbsp; <b>Y</b> <kbd>A</kbd><kbd>S</kbd> &nbsp; <b>Z</b> <kbd>Z</kbd><kbd>X</kbd><br />
       <b>시점</b> 마우스 드래그 &nbsp;·&nbsp; <b>VR</b> 우하단 고글 버튼
-    </div>
-
-    <div id="overlay">
-      <h1>게임 오버</h1>
-      <p class="finalScore">점수 0</p>
-      <button id="restartBtn">다시 시작</button>
     </div>
 
     <script type="module" src="/src/main.ts"></script>
