@@ -65,7 +65,16 @@ export function buildRoom(scene: Scene): void {
 // the tank when a VR recenter moves it.
 export function buildPedestal(scene: Scene, parent: TransformNode): void {
   const topR = Math.max(TANK_W, TANK_D) * 0.62;
-  const height = WELL_ANCHOR.y;
+  // Stop the column just short of wellRoot's origin so its cap does not land on
+  // exactly the same plane as the tank base above it. Two coincident faces
+  // z-fight, and in a headset that shimmer reads as a disc spinning under the
+  // tank — each eye resolves the tie differently and head motion animates it.
+  const INSET = 0.005;
+  // Bury the base below the floor for the same reason: the column's bottom cap
+  // would otherwise sit exactly on the room floor's plane — a second coincident
+  // circle, and the one actually down at floor level.
+  const SINK = 0.02;
+  const height = WELL_ANCHOR.y + SINK - INSET;
 
   const column = MeshBuilder.CreateCylinder(
     "pedestal",
@@ -73,7 +82,7 @@ export function buildPedestal(scene: Scene, parent: TransformNode): void {
     scene
   );
   column.parent = parent;
-  column.position.y = -height / 2; // wellRoot sits at the tank's BOTTOM
+  column.position.y = -INSET - height / 2; // wellRoot sits at the tank's BOTTOM
   column.isPickable = false;
 
   const pm = new StandardMaterial("pedestalMat", scene);
@@ -82,19 +91,6 @@ export function buildPedestal(scene: Scene, parent: TransformNode): void {
   pm.emissiveColor = new Color3(0.02, 0.025, 0.05);
   column.material = pm;
 
-  // Glowing lip where the tank meets the pedestal — grounds the tank visually.
-  const lip = MeshBuilder.CreateCylinder(
-    "pedestalLip",
-    { height: 0.012, diameter: topR * 2.1, tessellation: 32 },
-    scene
-  );
-  lip.parent = parent;
-  lip.position.y = -0.006;
-  lip.isPickable = false;
-  const lm = new StandardMaterial("lipMat", scene);
-  lm.diffuseColor = new Color3(0.2, 0.3, 0.6);
-  lm.emissiveColor = new Color3(0.16, 0.26, 0.6);
-  lip.material = lm;
 }
 
 // ─── Tank ───────────────────────────────────────────────────────────────────
@@ -189,14 +185,22 @@ function buildEdges(scene: Scene, parent: TransformNode, hx: number, hz: number)
     [hx, hz],
     [-hx, hz],
   ];
+  // Sunk slightly into the tank base so the post caps do not sit on its top plane.
   corners.forEach(([cx, cz], i) => {
-    bar(`post${i}`, { width: T, height: TANK_H, depth: T }, new Vector3(cx, TANK_H / 2, cz), postMat);
+    bar(
+      `post${i}`,
+      { width: T, height: TANK_H + T, depth: T },
+      new Vector3(cx, TANK_H / 2 - T / 2, cz),
+      postMat
+    );
   });
 
   // Bright top rim — the single most useful landmark for judging how much room
-  // is left before the stack tops out.
+  // is left before the stack tops out. The east/west bars are cut short by one
+  // bar width so they butt against the north/south pair instead of crossing it:
+  // overlapping bars share a top face at the corners and z-fight there.
   bar("rimN", { width: hx * 2 + T, height: T, depth: T }, new Vector3(0, TANK_H, -hz), rimMat);
   bar("rimS", { width: hx * 2 + T, height: T, depth: T }, new Vector3(0, TANK_H, hz), rimMat);
-  bar("rimW", { width: T, height: T, depth: hz * 2 + T }, new Vector3(-hx, TANK_H, 0), rimMat);
-  bar("rimE", { width: T, height: T, depth: hz * 2 + T }, new Vector3(hx, TANK_H, 0), rimMat);
+  bar("rimW", { width: T, height: T, depth: hz * 2 - T }, new Vector3(-hx, TANK_H, 0), rimMat);
+  bar("rimE", { width: T, height: T, depth: hz * 2 - T }, new Vector3(hx, TANK_H, 0), rimMat);
 }

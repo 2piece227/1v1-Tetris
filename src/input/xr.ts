@@ -1,8 +1,10 @@
 import {
   WebXRDefaultExperience,
   WebXRState,
+  type WebXRControllerComponent,
   type WebXRInputSource,
 } from "@babylonjs/core";
+import { HARD_DROP_COOLDOWN_MS } from "../config";
 import type { Sfx } from "../audio/sfx";
 import type { Game } from "../game/game";
 import type { Renderer } from "../render/renderer";
@@ -26,6 +28,21 @@ class Stepper {
       this.cooldown = this.cooldown < -this.FIRST ? this.REPEAT : this.FIRST;
     }
   }
+}
+
+/**
+ * Run `action` once per physical press.
+ *
+ * Babylon notifies onButtonStateChangedObservable whenever value, touched OR
+ * pressed changes, and an analog trigger streams value updates for the whole
+ * length of a squeeze. A handler that merely tests `c.pressed` therefore fires
+ * a dozen-plus times per pull — enough to hard drop a whole stack of pieces on
+ * one trigger. Only the false -> true transition counts as a press.
+ */
+function onPress(component: WebXRControllerComponent | null, action: () => void): void {
+  component?.onButtonStateChangedObservable.add((c) => {
+    if (c.changes.pressed?.current === true) action();
+  });
 }
 
 const THUMBSTICK = "xr-standard-thumbstick";
@@ -95,28 +112,35 @@ export async function setupXR(
       });
 
       if (hand === "right") {
-        // trigger → hard drop (on press)
-        trigger?.onButtonStateChangedObservable.add((c) => {
-          if (c.pressed && c.value > 0.6) game.hardDrop();
+        // trigger → hard drop, once per pull and no faster than the cooldown
+        let lastDrop = -Infinity;
+        onPress(trigger, () => {
+          const now = performance.now();
+          if (now - lastDrop < HARD_DROP_COOLDOWN_MS) return;
+          lastDrop = now;
+          game.hardDrop();
         });
         // A / B → rotate around Z
-        mc.getComponent("a-button")?.onButtonStateChangedObservable.add((c) => {
-          if (c.pressed) game.tryRotate("z", 1);
-        });
-        mc.getComponent("b-button")?.onButtonStateChangedObservable.add((c) => {
-          if (c.pressed) game.tryRotate("z", -1);
-        });
+        onPress(mc.getComponent("a-button"), () => game.tryRotate("z", 1));
+        onPress(mc.getComponent("b-button"), () => game.tryRotate("z", -1));
       } else {
-        // left squeeze / trigger → soft drop while held
-        const setSoft = (c: { pressed: boolean }) => {
-          game.softDropping = c.pressed;
+        // left squeeze / trigger → soft drop while either is held. Tracked
+        // separately because a single shared flag lets releasing one component
+        // cancel a hold still active on the other.
+        const held = { squeeze: false, trigger: false };
+        const apply = (): void => {
+          game.softDropping = held.squeeze || held.trigger;
         };
-        squeeze?.onButtonStateChangedObservable.add(setSoft);
-        trigger?.onButtonStateChangedObservable.add(setSoft);
-        // left X → re-plant the tank in front of me
-        mc.getComponent("x-button")?.onButtonStateChangedObservable.add((c) => {
-          if (c.pressed) recenter();
+        squeeze?.onButtonStateChangedObservable.add((c) => {
+          held.squeeze = c.pressed;
+          apply();
         });
+        trigger?.onButtonStateChangedObservable.add((c) => {
+          held.trigger = c.pressed;
+          apply();
+        });
+        // left X → re-plant the tank in front of me
+        onPress(mc.getComponent("x-button"), recenter);
       }
     });
   });

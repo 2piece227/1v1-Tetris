@@ -37,3 +37,8 @@ export const WELL_ANCHOR = { x: 0, y: 0.18, z: -0.7 } as const;
 // How far in front of the player the tank is planted when a VR session starts
 // (and on every recenter).
 export const XR_DISTANCE = 0.7;
+
+// Minimum gap between two hard drops. Edge detection already reduces a trigger
+// pull to a single drop; this is the backstop for a trigger that chatters
+// across the press threshold, where one twitch could otherwise bury the well.
+export const HARD_DROP_COOLDOWN_MS = 250;
