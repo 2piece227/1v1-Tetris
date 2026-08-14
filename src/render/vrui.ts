@@ -8,7 +8,6 @@ import {
   TextBlock,
 } from "@babylonjs/gui";
 import type { Game } from "../game/game";
-import { TANK_H } from "./environment";
 
 // Every panel here exists because the DOM HUD in index.html is invisible once
 // the headset enters an immersive session — the browser presents the WebXR
@@ -16,6 +15,13 @@ import { TANK_H } from "./environment";
 // inside the scene.
 
 const FONT = "system-ui, 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif";
+
+// Babylon's CreatePlane has normal (0,0,-1), so a panel at rotation.y = 0 faces
+// local -Z, and that is where the viewer stands: the desktop camera sits at -Z
+// and placeForXR turns the tank so the player ends up there too. Everything the
+// player reads therefore lives at NEGATIVE local z and yaws by these signs —
+// a panel on the +x side needs a POSITIVE yaw to angle inward, and vice versa.
+const YAW_IN = 0.42;
 
 interface Panel {
   plane: Mesh;
@@ -80,8 +86,18 @@ export class VrUi {
   constructor(scene: Scene, parent: TransformNode, onRestart: () => void) {
     this.buildHelp(scene, parent);
 
-    // ── Score, floating just above the rim so a glance up reads it ──────────
-    const score = makePanel(scene, parent, "uiScore", 0.3, 0.15, new Vector3(0, TANK_H + 0.15, 0), 0);
+    // ── Score, beside the tank at eye level ────────────────────────────────
+    // It used to sit above the rim, which worked at 8 layers deep. At 18 the
+    // rim is already near eye level and anything above it is a neck-craner.
+    const score = makePanel(
+      scene,
+      parent,
+      "uiScore",
+      0.26,
+      0.13,
+      new Vector3(0.36, 1.02, -0.08),
+      YAW_IN
+    );
     backdrop(score.adt);
 
     const scoreStack = new StackPanel();
@@ -103,7 +119,10 @@ export class VrUi {
       "uiGameOver",
       0.44,
       0.3,
-      new Vector3(0, TANK_H * 0.6, 0.3),
+      // Near eye height and half a metre out. Lower or closer than this and the
+      // player is reading a panel at a steep downward angle from 30cm away,
+      // which is uncomfortable to focus on in a headset.
+      new Vector3(0, 1.22, -0.2),
       0
     );
     backdrop(this.gameOver.adt, 0.94);
@@ -139,7 +158,15 @@ export class VrUi {
   // Legend angled toward the player on the left. A festival player has nobody
   // to ask and about ten seconds of patience, so the bindings live in-world.
   private buildHelp(scene: Scene, parent: TransformNode): void {
-    const help = makePanel(scene, parent, "uiHelp", 0.36, 0.44, new Vector3(-0.44, 0.5, 0.12), 0.5);
+    const help = makePanel(
+      scene,
+      parent,
+      "uiHelp",
+      0.33,
+      0.4,
+      new Vector3(-0.36, 0.88, -0.1),
+      -YAW_IN
+    );
     backdrop(help.adt);
 
     const stack = new StackPanel();

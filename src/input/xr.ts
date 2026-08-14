@@ -40,7 +40,14 @@ export async function setupXR(
   let xr: WebXRDefaultExperience;
   try {
     xr = await renderer.scene.createDefaultXRExperienceAsync({
+      // This game is thumbstick and buttons only. Every extra default feature
+      // is geometry Babylon draws into the room that the player then has to
+      // work out the meaning of — near-interaction spheres on the controllers,
+      // hand meshes, teleport targets on the floor. Pointer selection stays
+      // because the game-over restart button is picked with the controller ray.
       disableTeleportation: true,
+      disableNearInteraction: true,
+      disableHandTracking: true,
     });
   } catch {
     return null; // e.g. desktop browser without WebXR — keyboard still works
@@ -118,7 +125,7 @@ export async function setupXR(
   renderer.scene.onBeforeRenderObservable.add(() => {
     const dt = renderer.engine.getDeltaTime();
     moveX.update(leftStick.x, dt);
-    moveZ.update(-leftStick.y, dt); // stick up (−y) = push away (−z)
+    moveZ.update(-leftStick.y, dt); // stick up is −y; away from the player is +z
     yaw.update(rightStick.x, dt);
     pitch.update(-rightStick.y, dt);
   });

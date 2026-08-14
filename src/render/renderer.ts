@@ -18,6 +18,13 @@ import { TANK_H, buildPedestal, buildRoom, buildTank } from "./environment";
 
 const { w, d } = WELL;
 
+// Where the next-piece preview perches, in wellRoot-local space. Beside the
+// tank rather than above it: at 18 layers deep the rim is already near eye
+// level and anything stacked on top would be out of comfortable view.
+// Negative z is the player's side of the tank (Babylon planes face -Z, and the
+// desktop camera and the XR recenter both put the viewer there).
+const NEXT_AT = { x: 0.34, y: 0.72, z: -0.06 };
+
 // grid cell (integer) -> local position inside wellRoot (which sits at the
 // tank's bottom, centred on the tank footprint)
 function cellToLocal(x: number, y: number, z: number): Vector3 {
@@ -37,13 +44,11 @@ export class Renderer {
   private readonly solidPool: Mesh[] = [];
   private readonly ghostPool: Mesh[] = [];
   private readonly guidePool: Mesh[] = [];
-  private readonly footPool: Mesh[] = [];
   private readonly nextPool: Mesh[] = [];
 
   private readonly solidMaster: Mesh;
   private readonly ghostMaster: Mesh;
   private readonly guideMaster: Mesh;
-  private readonly footMaster: Mesh;
   private readonly nextMaster: Mesh;
 
   private readonly matByColor = new Map<number, StandardMaterial>();
@@ -107,24 +112,9 @@ export class Renderer {
     gdm.disableDepthWrite = true;
     this.guideMaster.material = gdm;
 
-    // Footprint on the tank floor — lets you line the piece up against the
-    // printed grid instead of eyeballing it.
-    this.footMaster = this.makeMaster(
-      "foot",
-      MeshBuilder.CreatePlane("foot", { size: CELL * 0.82 }, this.scene)
-    );
-    this.footMaster.rotation.x = Math.PI / 2;
-    const fm = new StandardMaterial("footMat", this.scene);
-    fm.diffuseColor = new Color3(0.5, 0.7, 1);
-    fm.emissiveColor = new Color3(0.35, 0.5, 0.9);
-    fm.alpha = 0.4;
-    fm.backFaceCulling = false;
-    fm.disableDepthWrite = true;
-    this.footMaster.material = fm;
-
     this.nextMaster = this.makeMaster(
       "next",
-      MeshBuilder.CreateBox("next", { size: CELL * 0.42 }, this.scene)
+      MeshBuilder.CreateBox("next", { size: CELL * 0.55 }, this.scene)
     );
 
     this.buildNextPlinth();
@@ -145,11 +135,11 @@ export class Renderer {
   private buildNextPlinth(): void {
     const plate = MeshBuilder.CreateBox(
       "nextPlate",
-      { width: 0.13, height: 0.006, depth: 0.13 },
+      { width: 0.11, height: 0.006, depth: 0.11 },
       this.scene
     );
     plate.parent = this.wellRoot;
-    plate.position.set(0.42, 0.52, 0.02);
+    plate.position.set(NEXT_AT.x, NEXT_AT.y - 0.05, NEXT_AT.z);
     plate.isPickable = false;
     const m = new StandardMaterial("nextPlateMat", this.scene);
     m.diffuseColor = new Color3(0.1, 0.13, 0.22);
@@ -201,7 +191,6 @@ export class Renderer {
 
     let g = 0;
     let guides = 0;
-    let feet = 0;
 
     if (!game.gameOver) {
       const gp = game.ghostPos();
@@ -225,17 +214,11 @@ export class Renderer {
           mesh.position.set(cellToLocal(cx, 0, cz).x, (top + bottom) / 2, cellToLocal(cx, 0, cz).z);
           mesh.scaling.y = Math.max(0.001, top - bottom);
         }
-
-        // Footprint square on the tank floor.
-        const foot = this.borrow(this.footPool, this.footMaster, feet++);
-        const local = cellToLocal(cx, 0, cz);
-        foot.position.set(local.x, 0.006, local.z);
       }
     }
 
     this.hideFrom(this.ghostPool, g);
     this.hideFrom(this.guidePool, guides);
-    this.hideFrom(this.footPool, feet);
 
     this.drawNext(game);
   }
@@ -249,13 +232,17 @@ export class Renderer {
     const cx = mid((c) => c.x);
     const cy = mid((c) => c.y);
     const cz = mid((c) => c.z);
-    const S = CELL * 0.45;
+    const S = CELL * 0.6;
     const mat = this.solidMat(game.next.color);
 
     let n = 0;
     for (const c of cells) {
       const mesh = this.borrow(this.nextPool, this.nextMaster, n++);
-      mesh.position.set(0.42 + (c.x - cx) * S, 0.56 + (c.y - cy) * S, 0.02 + (c.z - cz) * S);
+      mesh.position.set(
+        NEXT_AT.x + (c.x - cx) * S,
+        NEXT_AT.y + (c.y - cy) * S,
+        NEXT_AT.z + (c.z - cz) * S
+      );
       mesh.material = mat;
     }
     this.hideFrom(this.nextPool, n);
@@ -289,7 +276,13 @@ export class Renderer {
       WELL_ANCHOR.y,
       headPos.z + f.z * XR_DISTANCE
     );
-    // Turn the tank's +z face (where the panels live) back toward the player.
-    this.wellRoot.rotation.y = Math.atan2(-f.x, -f.z);
+    // Turn the tank's front face (where the panels live) back toward the player.
+    // Babylon's CreatePlane has normal (0,0,-1), so the panels face local -Z and
+    // the player must end up on the tank's -Z side: local +Z maps to world +f,
+    // which is atan2(f.x, f.z). Negating both arguments lands 180° out — the
+    // panels then render their unculled back face (mirrored text) and, far
+    // worse, every horizontal control comes out reversed because the grid is
+    // parented to this same node.
+    this.wellRoot.rotation.y = Math.atan2(f.x, f.z);
   }
 }
