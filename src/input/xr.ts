@@ -45,6 +45,38 @@ function onPress(component: WebXRControllerComponent | null, action: () => void)
   });
 }
 
+/**
+ * One action per stick deflection, with no auto-repeat: the stick has to come
+ * back near neutral before it will fire again.
+ *
+ * Rotation wants this and movement does not. Holding the stick to slide a piece
+ * across the well is useful; holding it and having the piece spin four times is
+ * just disorienting, which is what testers kept running into.
+ *
+ * FIRE and REARM differ on purpose. With a single threshold a stick left
+ * resting near the edge chatters across it and fires repeatedly — the same
+ * defect the hard-drop trigger had.
+ */
+export class Flick {
+  private armed = true;
+  private static readonly FIRE = 0.6;
+  private static readonly REARM = 0.3;
+
+  constructor(private readonly onFlick: (dir: 1 | -1) => void) {}
+
+  update(value: number): void {
+    const mag = Math.abs(value);
+    if (mag < Flick.REARM) {
+      this.armed = true;
+      return;
+    }
+    if (this.armed && mag >= Flick.FIRE) {
+      this.armed = false;
+      this.onFlick(value > 0 ? 1 : -1);
+    }
+  }
+}
+
 const THUMBSTICK = "xr-standard-thumbstick";
 const TRIGGER = "xr-standard-trigger";
 const SQUEEZE = "xr-standard-squeeze";
@@ -89,11 +121,12 @@ export async function setupXR(
     }
   });
 
-  // Per-hand analog stick steppers.
+  // Left stick slides the piece and keeps auto-repeat, so you can hold it to
+  // cross the well. The right stick rotates and fires once per deflection.
   const moveX = new Stepper((d) => game.tryMove(d, 0));
   const moveZ = new Stepper((d) => game.tryMove(0, d));
-  const yaw = new Stepper((d) => game.tryRotate("y", d === 1 ? 1 : -1));
-  const pitch = new Stepper((d) => game.tryRotate("x", d === 1 ? 1 : -1));
+  const yaw = new Flick((d) => game.tryRotate("y", d));
+  const pitch = new Flick((d) => game.tryRotate("x", d));
 
   const leftStick = { x: 0, y: 0 };
   const rightStick = { x: 0, y: 0 };
@@ -150,8 +183,14 @@ export async function setupXR(
     const dt = renderer.engine.getDeltaTime();
     moveX.update(leftStick.x, dt);
     moveZ.update(-leftStick.y, dt); // stick up is −y; away from the player is +z
-    yaw.update(rightStick.x, dt);
-    pitch.update(-rightStick.y, dt);
+
+    // Only the dominant axis rotates. Pushed diagonally both axes clear the
+    // fire threshold, and yawing and pitching off one flick reads as the game
+    // spinning the piece at random.
+    const rx = rightStick.x;
+    const ry = -rightStick.y;
+    yaw.update(Math.abs(rx) >= Math.abs(ry) ? rx : 0);
+    pitch.update(Math.abs(ry) > Math.abs(rx) ? ry : 0);
   });
 
   return xr;

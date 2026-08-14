@@ -80,6 +80,7 @@ function text(
 export class VrUi {
   private readonly scoreValue: TextBlock;
   private readonly scoreSub: TextBlock;
+  private readonly tierLabel: TextBlock;
   private readonly gameOver: Panel;
   private readonly gameOverScore: TextBlock;
 
@@ -111,6 +112,12 @@ export class VrUi {
     this.scoreSub = text("레이어 0 · 레벨 1", 48, "#93a0d8");
     this.scoreSub.height = "70px";
     scoreStack.addControl(this.scoreSub);
+
+    // Own line: without it the player has no way to tell the bag just changed
+    // under them, and the new pieces read as the game glitching.
+    this.tierLabel = text("입문", 44, "#f0b64a", { bold: true });
+    this.tierLabel.height = "60px";
+    scoreStack.addControl(this.tierLabel);
 
     // ── Game over, parked in front of the tank ─────────────────────────────
     this.gameOver = makePanel(
@@ -218,6 +225,7 @@ export class VrUi {
   update(game: Game): void {
     this.scoreValue.text = String(game.score);
     this.scoreSub.text = `레이어 ${game.layers} · 레벨 ${game.level}`;
+    this.tierLabel.text = game.tierLabel;
   }
 
   showGameOver(game: Game): void {

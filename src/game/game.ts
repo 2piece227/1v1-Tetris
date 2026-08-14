@@ -7,8 +7,9 @@ import {
   SOFT_DROP_MS,
   WELL,
 } from "../config";
+import { Bag } from "./bag";
 import { Grid } from "./grid";
-import { PieceDef, randomPiece } from "./pieces";
+import { PieceDef, TIERS } from "./pieces";
 import { Axis, IVec3, rotate } from "./vec";
 
 const { w, d, h } = WELL;
@@ -31,10 +32,12 @@ const KICKS: IVec3[] = [
 export class Game {
   readonly grid = new Grid();
 
+  readonly bag = new Bag();
+
   current!: PieceDef;
   cells!: IVec3[]; // current rotated offsets
   pos!: IVec3; // pivot position in the well
-  next: PieceDef = randomPiece();
+  next: PieceDef = this.bag.take(0);
 
   score = 0;
   level = 1;
@@ -65,9 +68,14 @@ export class Game {
     return Math.max(MIN_DROP_MS, BASE_DROP_MS - (this.level - 1) * LEVEL_SPEEDUP_MS);
   }
 
+  /** Label of the bag composition currently in play, for the HUD. */
+  get tierLabel(): string {
+    return TIERS[Math.max(0, this.bag.tierIndex)].label;
+  }
+
   private spawn(): void {
     this.current = this.next;
-    this.next = randomPiece();
+    this.next = this.bag.take(this.score);
     this.cells = this.current.cells.map((c) => ({ ...c }));
 
     // Centre the piece's own bounding box in the well rather than parking the
@@ -179,7 +187,8 @@ export class Game {
     this.layers = 0;
     this.gameOver = false;
     this.softDropping = false;
-    this.next = randomPiece();
+    this.bag.reset();
+    this.next = this.bag.take(0);
     this.spawn();
   }
 }
