@@ -2,6 +2,7 @@ import {
   Color3,
   Color4,
   FreeCamera,
+  LinesMesh,
   Mesh,
   MeshBuilder,
   Scene,
@@ -43,7 +44,7 @@ export class PlayerView {
   private readonly ghostPool: Mesh[] = [];
   private readonly guidePool: Mesh[] = [];
   private readonly solidMaster: Mesh;
-  private readonly pieceMaster: Mesh;
+  private readonly pieceMaster: LinesMesh;
   private readonly ghostMaster: Mesh;
   private readonly guideMaster: Mesh;
   private readonly matByColor = new Map<number, StandardMaterial>();
@@ -75,21 +76,13 @@ export class PlayerView {
       MeshBuilder.CreateBox("solid", { size: CELL * 0.9 }, scene)
     );
 
-    // The live piece is a hollow cage. Seen from directly above, a solid piece
-    // sits on top of everything it is about to land on and hides exactly the
-    // part of the well the player needs to judge. Edges only, interior clear.
-    this.pieceMaster = this.master(
-      MeshBuilder.CreateBox("piece", { size: CELL * 0.94 }, scene)
-    );
-    const pm = new StandardMaterial("pieceMat", scene);
-    pm.diffuseColor = new Color3(1, 1, 1);
-    pm.emissiveColor = new Color3(1, 1, 1);
-    // Not fully zero: the mesh still has to be submitted for the edge pass to
-    // run, and a hint of fill keeps the cage from reading as flat line art.
-    pm.alpha = 0.05;
-    pm.disableDepthWrite = true;
-    this.pieceMaster.material = pm;
-    this.edged(this.pieceMaster);
+    // The live piece is real line geometry, not a solid box with edge rendering
+    // switched on. Seen from directly above a filled piece covers the very part
+    // of the well the player is aiming at; and edge rendering takes its width in
+    // world units, which at this cell size turned the outline into a solid slab.
+    // Lines rasterise a pixel wide at any scale, which is the Blockout look and
+    // needs no tuning.
+    this.pieceMaster = this.cubeOutline("piece", CELL * 0.47, scene);
 
     this.ghostMaster = this.master(
       MeshBuilder.CreateBox("ghost", { size: CELL * 0.88 }, scene)
@@ -129,11 +122,22 @@ export class PlayerView {
     return mesh;
   }
 
-  /** Bright cage outline. Clones do not inherit an edges renderer. */
-  private edged(mesh: Mesh): Mesh {
-    mesh.enableEdgesRendering();
-    mesh.edgesWidth = 5;
-    mesh.edgesColor = new Color4(1, 1, 1, 1);
+  /** The twelve edges of a cube, as line geometry. */
+  private cubeOutline(name: string, s: number, scene: Scene): LinesMesh {
+    const p = (x: number, y: number, z: number) => new Vector3(x * s, y * s, z * s);
+    const loop = (y: number) => [
+      p(-1, y, -1), p(1, y, -1), p(1, y, 1), p(-1, y, 1), p(-1, y, -1),
+    ];
+    const lines: Vector3[][] = [loop(-1), loop(1)];
+    const posts: [number, number][] = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+    for (const [x, z] of posts) lines.push([p(x, -1, z), p(x, 1, z)]);
+
+    const mesh = MeshBuilder.CreateLineSystem(name, { lines }, scene);
+    mesh.color = new Color3(1, 1, 1);
+    mesh.isVisible = false;
+    mesh.isPickable = false;
+    mesh.layerMask = this.mask;
+    mesh.parent = this.root;
     return mesh;
   }
 
@@ -216,13 +220,12 @@ export class PlayerView {
     return m;
   }
 
-  private borrow(pool: Mesh[], master: Mesh, i: number, edges = false): Mesh {
+  private borrow(pool: Mesh[], master: Mesh, i: number): Mesh {
     let mesh = pool[i];
     if (!mesh) {
       mesh = master.clone(master.name + "_" + pool.length, this.root)!;
       mesh.isVisible = true;
       mesh.layerMask = this.mask;
-      if (edges) this.edged(mesh);
       pool.push(mesh);
     }
     mesh.setEnabled(true);
@@ -249,7 +252,7 @@ export class PlayerView {
 
     if (!game.gameOver) {
       for (const c of game.cells) {
-        const cage = this.borrow(this.piecePool, this.pieceMaster, p++, true);
+        const cage = this.borrow(this.piecePool, this.pieceMaster, p++);
         cage.position.copyFrom(
           cellToLocal(game.pos.x + c.x, game.pos.y + c.y, game.pos.z + c.z)
         );

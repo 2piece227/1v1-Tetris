@@ -1,14 +1,14 @@
-import {
-  AdvancedDynamicTexture,
-  Control,
-  Rectangle,
-  TextBlock,
-} from "@babylonjs/gui";
+import { AdvancedDynamicTexture, Control, TextBlock } from "@babylonjs/gui";
 import { LAYER_COLORS, WELL } from "../config";
 import type { Game } from "../game/game";
 
 const { h } = WELL;
 const FONT = "system-ui, 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif";
+
+/** Vertical pitch of one row of the layer key, in pixels. */
+const ROW = 34;
+/** Distance from the centre divider out to each number. */
+const GAP = 26;
 
 const hex = (c: number): string => "#" + c.toString(16).padStart(6, "0");
 
@@ -16,13 +16,9 @@ const hex = (c: number): string => "#" + c.toString(16).padStart(6, "0");
  * Scores, and the layer key down the middle of the screen.
  *
  * The key is the legend for the well's depth colouring: one row per layer,
- * numbered, in that layer's colour. It reads bottom-up the way the well is
- * built — layer 7 at the top of the column, layer 1 at the bottom — so the
- * column mirrors the shaft rather than fighting it.
- *
- * It sits on the centre divider and prints each number twice, once on either
- * side. Both players then read the key nearest their own half instead of one
- * of them squinting across the screen.
+ * numbered in that layer's colour, ordered mouth-at-top so the column mirrors
+ * the shaft rather than fighting it. Each number is printed on both sides of
+ * the divider so each player reads the copy nearest their own half.
  */
 export class Hud {
   private readonly scores: TextBlock[] = [];
@@ -45,7 +41,7 @@ export class Hud {
     name.fontFamily = FONT;
     name.fontWeight = "700";
     name.height = "28px";
-    name.top = "18px";
+    name.top = "30px";
     name.left = `${offsetPct}%`;
     name.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
     ui.addControl(name);
@@ -56,7 +52,7 @@ export class Hud {
     score.fontFamily = FONT;
     score.fontWeight = "700";
     score.height = "52px";
-    score.top = "44px";
+    score.top = "60px";
     score.left = `${offsetPct}%`;
     score.verticalAlignment = Control.VERTICAL_ALIGNMENT_TOP;
     ui.addControl(score);
@@ -64,41 +60,31 @@ export class Hud {
   }
 
   private buildLayerKey(ui: AdvancedDynamicTexture): void {
-    const column = new Rectangle("layerKey");
-    column.width = "150px";
-    column.height = `${h * 34}px`;
-    column.thickness = 0;
-    column.background = "transparent";
-    column.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
-    column.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
-    ui.addControl(column);
-
     for (let row = 0; row < h; row++) {
-      const layer = h - row; // 1-based, mouth at the top of the column
+      const layer = h - row; // mouth at the top of the column
       const color = hex(LAYER_COLORS[layer - 1]);
+      const y = (row - (h - 1) / 2) * ROW;
 
-      const line = new Rectangle(`key_row${layer}`);
-      line.width = "100%";
-      line.height = "34px";
-      line.thickness = 0;
-      line.background = "transparent";
-      line.top = `${row * 34 - (h * 34) / 2 + 17}px`;
-      line.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
-      column.addControl(line);
-
-      for (const side of ["left", "right"] as const) {
-        const t = new TextBlock(`key_${layer}_${side}`, String(layer));
+      for (const dir of [-1, 1]) {
+        const t = new TextBlock(
+          `key_${layer}_${dir < 0 ? "left" : "right"}`,
+          String(layer)
+        );
         t.color = color;
         t.fontSize = 24;
         t.fontFamily = FONT;
         t.fontWeight = "700";
-        t.horizontalAlignment =
-          side === "left"
-            ? Control.HORIZONTAL_ALIGNMENT_LEFT
-            : Control.HORIZONTAL_ALIGNMENT_RIGHT;
-        if (side === "left") t.paddingLeft = "12px";
-        else t.paddingRight = "12px";
-        line.addControl(t);
+        // A TextBlock is 100% wide by default, so aligning the *control* moves
+        // nothing and both numbers render centred on top of one another —
+        // which is what turned "7 | 7" into "77". Give each a fixed box and
+        // offset that box from the centre instead.
+        t.width = `${GAP}px`;
+        t.height = `${ROW}px`;
+        t.left = `${dir * GAP}px`;
+        t.top = `${y}px`;
+        t.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+        t.verticalAlignment = Control.VERTICAL_ALIGNMENT_CENTER;
+        ui.addControl(t);
       }
     }
   }

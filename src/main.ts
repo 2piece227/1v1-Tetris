@@ -19,6 +19,16 @@ const players = [p1, p2];
 type Phase = "ready" | "playing" | "over";
 let phase: Phase = "ready";
 
+/**
+ * How long the win card ignores the drop buttons.
+ *
+ * Players hammer the drop button, and the press that ends the round is usually
+ * one of several already on the way. Without a lockout the win card is
+ * dismissed in the same burst that caused it and nobody ever reads who won.
+ */
+const WIN_CARD_LOCKOUT_MS = 900;
+let overSince = 0;
+
 function draw(): void {
   renderer.redraw(p1, p2);
 }
@@ -45,6 +55,7 @@ function sendAttack(_attacker: Game, _victim: Game, _layers: number): void {
 
 function startRound(): void {
   if (phase === "playing") return;
+  overSince = 0;
   for (const g of players) g.reset();
   startCard.classList.remove("show");
   banner.classList.remove("show");
@@ -55,12 +66,13 @@ function startRound(): void {
 function endRound(loser: Game): void {
   if (phase !== "playing") return;
   phase = "over";
+  overSince = performance.now();
   bannerText.textContent = `${loser === p1 ? "2P" : "1P"} 승리`;
   banner.classList.add("show");
   sfx.gameOver();
 }
 
-/** Back to the start card, so the next pair at the cabinet sees it. */
+/** Back to the start card. Reachable from the win card, not automatic. */
 function toStartCard(): void {
   phase = "ready";
   banner.classList.remove("show");
@@ -89,8 +101,17 @@ attachKeyboard(p1, p2, sfx, () => phase === "playing");
 // the first piece the instant the round begins.
 window.addEventListener("keyup", (e) => {
   if (e.code === "F5") return;
-  if (phase === "ready" && (e.code === "Space" || e.code === "Enter")) startRound();
-  else if (phase === "over" && (e.code === "Space" || e.code === "Enter")) toStartCard();
+  const go = e.code === "Space" || e.code === "Enter";
+  // From the win card a drop button starts the next round outright. Sending
+  // players back to the start card first is one extra press between them and a
+  // rematch, and at a cabinet that press is the whole queue waiting.
+  if (!go) {
+    if (phase === "over" && e.code === "Escape") toStartCard();
+    return;
+  }
+  if (phase === "ready") startRound();
+  else if (phase === "over" && performance.now() - overSince >= WIN_CARD_LOCKOUT_MS)
+    startRound();
 });
 window.addEventListener("keydown", (e) => {
   // F5 would reload and lose the cabinet's fullscreen window.
@@ -98,7 +119,7 @@ window.addEventListener("keydown", (e) => {
 });
 
 document.getElementById("startBtn")!.addEventListener("click", startRound);
-document.getElementById("restartBtn")!.addEventListener("click", toStartCard);
+document.getElementById("restartBtn")!.addEventListener("click", startRound);
 
 // Gravity for both wells, off one clock.
 renderer.scene.onBeforeRenderObservable.add(() => {
