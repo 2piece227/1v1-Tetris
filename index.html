@@ -2,37 +2,59 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>VR 블럭아웃 · 3D 테트리스</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>블럭아웃 대전 · 1P vs 2P</title>
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
-      html, body { width: 100%; height: 100%; overflow: hidden; background: #05060a; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+      html, body { width: 100%; height: 100%; overflow: hidden; background: #05060a; font-family: system-ui, "Malgun Gothic", sans-serif; }
       #renderCanvas { width: 100%; height: 100%; display: block; touch-action: none; outline: none; }
 
-      /* Score and game-over now live in the 3D scene (src/render/vrui.ts) so
-         they survive entering VR, where the DOM is not presented at all.
-         What stays here is desktop-only by nature — invisible in the headset,
-         which is exactly where the keyboard legend belongs. */
-      #help {
-        position: fixed; bottom: 16px; left: 16px; color: #aeb6d8; font-size: 12.5px;
-        line-height: 1.6; background: rgba(10,14,28,0.55); padding: 12px 14px; border-radius: 10px;
-        backdrop-filter: blur(6px); pointer-events: none; user-select: none; max-width: 300px;
+      /* Control legend, one per side. Cabinet players read this once while
+         waiting in the queue, so it sits low and out of the playfield. */
+      .legend {
+        position: fixed; bottom: 14px; color: #7f8bb5; font-size: 12px; line-height: 1.7;
+        user-select: none; pointer-events: none; white-space: nowrap;
       }
-      #help b { color: #dfe5ff; }
-      #help kbd {
-        background: #1c2340; border: 1px solid #2e3860; border-radius: 4px; padding: 1px 6px;
-        font-family: inherit; font-size: 11.5px; color: #cdd5ff;
+      .legend.p1 { left: 3%; }
+      .legend.p2 { right: 3%; text-align: right; }
+      .legend b { color: #c3ccf0; }
+      .legend kbd {
+        background: #161d38; border: 1px solid #2b3560; border-radius: 3px;
+        padding: 0 5px; font-family: inherit; font-size: 11px; color: #cdd5ff;
       }
 
+      #banner {
+        position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+        flex-direction: column; gap: 20px; background: rgba(4,6,12,0.78); color: #fff; text-align: center;
+      }
+      #banner.show { display: flex; }
+      #bannerText { font-size: 64px; font-weight: 800; letter-spacing: 2px; }
+      #banner button {
+        font-size: 18px; font-weight: 700; color: #05060a; background: #7c8bff;
+        border: none; border-radius: 10px; padding: 14px 34px; cursor: pointer;
+      }
+      #banner small { color: #9aa5d4; font-size: 14px; }
     </style>
   </head>
   <body>
     <canvas id="renderCanvas"></canvas>
 
-    <div id="help">
-      <b>이동</b> <kbd>←</kbd><kbd>→</kbd><kbd>↑</kbd><kbd>↓</kbd> &nbsp; <b>낙하</b> <kbd>Space</kbd> / <kbd>Shift</kbd><br />
-      <b>회전 X</b> <kbd>Q</kbd><kbd>W</kbd> &nbsp; <b>Y</b> <kbd>A</kbd><kbd>S</kbd> &nbsp; <b>Z</b> <kbd>Z</kbd><kbd>X</kbd><br />
-      <b>시점</b> 마우스 드래그 &nbsp;·&nbsp; <b>VR</b> 우하단 고글 버튼
+    <div class="legend p1">
+      <b>1P</b> 이동 <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> &nbsp;
+      회전 <kbd>Q</kbd><kbd>E</kbd><kbd>R</kbd><br />
+      떨구기 <kbd>Space</kbd> &nbsp; 천천히 <kbd>L-Shift</kbd>
+    </div>
+
+    <div class="legend p2">
+      <b>2P</b> 이동 <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> &nbsp;
+      회전 <kbd>U</kbd><kbd>I</kbd><kbd>O</kbd><br />
+      떨구기 <kbd>Enter</kbd> &nbsp; 천천히 <kbd>R-Shift</kbd>
+    </div>
+
+    <div id="banner">
+      <div id="bannerText">1P 승리</div>
+      <button id="restartBtn">다시 시작</button>
+      <small>F1</small>
     </div>
 
     <script type="module" src="/src/main.ts"></script>

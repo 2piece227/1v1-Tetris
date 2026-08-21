@@ -1,33 +1,89 @@
 import type { Sfx } from "../audio/sfx";
 import type { Game } from "../game/game";
 
-// Desktop controls — also the fastest way to test without a headset.
-// Keyed off `event.key` (always populated) rather than `event.code`, so it
-// works across layouts and with synthetic events.
-export function attachKeyboard(game: Game, sfx: Sfx): void {
+/**
+ * Two players on one keyboard.
+ *
+ * The layout assumes a cabinet panel per player: a four-way stick for movement
+ * plus five buttons. That is nine inputs, which fits a standard arcade panel —
+ * the VR build's six rotation directions would not. Each axis therefore gets a
+ * single button that always turns the same way; press it four times to come
+ * back round. A USB arcade encoder presents itself as a keyboard, so these are
+ * the codes to map the panel to.
+ *
+ * Bindings are keyed off `event.code`, not `event.key`: a physical panel button
+ * should not change meaning if the machine boots with a different keyboard
+ * layout, and `code` is layout-independent.
+ */
+interface Binding {
+  moveLeft: string;
+  moveRight: string;
+  moveAway: string;
+  moveToward: string;
+  rotX: string;
+  rotY: string;
+  rotZ: string;
+  hardDrop: string;
+  softDrop: string;
+}
+
+export const P1_KEYS: Binding = {
+  moveLeft: "KeyA",
+  moveRight: "KeyD",
+  moveAway: "KeyW",
+  moveToward: "KeyS",
+  rotX: "KeyQ",
+  rotY: "KeyE",
+  rotZ: "KeyR",
+  hardDrop: "Space",
+  softDrop: "ShiftLeft",
+};
+
+export const P2_KEYS: Binding = {
+  moveLeft: "ArrowLeft",
+  moveRight: "ArrowRight",
+  moveAway: "ArrowUp",
+  moveToward: "ArrowDown",
+  rotX: "KeyU",
+  rotY: "KeyI",
+  rotZ: "KeyO",
+  hardDrop: "Enter",
+  softDrop: "ShiftRight",
+};
+
+function bind(game: Game, keys: Binding, sfx: Sfx): void {
   window.addEventListener("keydown", (e) => {
-    sfx.unlock(); // first keypress is the user gesture WebAudio waits for
-    const k = e.key.toLowerCase();
+    if (e.repeat && e.code !== keys.softDrop) {
+      // Held keys must not machine-gun. Auto-repeat on hard drop buries the
+      // well in one press; on rotation it spins the piece past where you
+      // wanted it. Movement is the one place a repeat would be useful, and it
+      // is dropped too so that every binding behaves the same way.
+      if (e.code !== keys.softDrop) e.preventDefault();
+      return;
+    }
+    sfx.unlock();
     let used = true;
-    switch (k) {
-      case "arrowleft": game.tryMove(-1, 0); break;
-      case "arrowright": game.tryMove(1, 0); break;
-      case "arrowup": game.tryMove(0, -1); break;
-      case "arrowdown": game.tryMove(0, 1); break;
-      case "q": game.tryRotate("x", 1); break;
-      case "w": game.tryRotate("x", -1); break;
-      case "a": game.tryRotate("y", 1); break;
-      case "s": game.tryRotate("y", -1); break;
-      case "z": game.tryRotate("z", 1); break;
-      case "x": game.tryRotate("z", -1); break;
-      case " ": if (!e.repeat) game.hardDrop(); break;
-      case "shift": game.softDropping = true; break;
+    switch (e.code) {
+      case keys.moveLeft: game.tryMove(-1, 0); break;
+      case keys.moveRight: game.tryMove(1, 0); break;
+      case keys.moveAway: game.tryMove(0, 1); break;
+      case keys.moveToward: game.tryMove(0, -1); break;
+      case keys.rotX: game.tryRotate("x", 1); break;
+      case keys.rotY: game.tryRotate("y", 1); break;
+      case keys.rotZ: game.tryRotate("z", 1); break;
+      case keys.hardDrop: game.hardDrop(); break;
+      case keys.softDrop: game.softDropping = true; break;
       default: used = false;
     }
     if (used) e.preventDefault();
   });
 
   window.addEventListener("keyup", (e) => {
-    if (e.key === "Shift") game.softDropping = false;
+    if (e.code === keys.softDrop) game.softDropping = false;
   });
+}
+
+export function attachKeyboard(p1: Game, p2: Game, sfx: Sfx): void {
+  bind(p1, P1_KEYS, sfx);
+  bind(p2, P2_KEYS, sfx);
 }

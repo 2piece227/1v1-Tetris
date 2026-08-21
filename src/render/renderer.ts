@@ -1,288 +1,82 @@
 import {
-  ArcRotateCamera,
   Color3,
   Color4,
   DirectionalLight,
   Engine,
+  FreeCamera,
   HemisphericLight,
-  Mesh,
-  MeshBuilder,
   Scene,
-  StandardMaterial,
-  TransformNode,
   Vector3,
+  Viewport,
 } from "@babylonjs/core";
-import { CELL, WELL, WELL_ANCHOR, XR_DISTANCE } from "../config";
+import { AdvancedDynamicTexture, Control, Rectangle } from "@babylonjs/gui";
+import { LAYER_1P, LAYER_2P } from "../config";
 import type { Game } from "../game/game";
-import { TANK_H, buildPedestal, buildRoom, buildTank } from "./environment";
+import { PlayerHud } from "./playerHud";
+import { PlayerView } from "./playerView";
 
-const { w, d } = WELL;
-
-// Where the next-piece preview perches, in wellRoot-local space. Beside the
-// tank rather than above it: at 18 layers deep the rim is already near eye
-// level and anything stacked on top would be out of comfortable view.
-// Negative z is the player's side of the tank (Babylon planes face -Z, and the
-// desktop camera and the XR recenter both put the viewer there).
-const NEXT_AT = { x: 0.34, y: 0.72, z: -0.06 };
-
-// grid cell (integer) -> local position inside wellRoot (which sits at the
-// tank's bottom, centred on the tank footprint)
-function cellToLocal(x: number, y: number, z: number): Vector3 {
-  return new Vector3(
-    (x - (w - 1) / 2) * CELL,
-    y * CELL + CELL / 2,
-    (z - (d - 1) / 2) * CELL
-  );
-}
+/** UI gets its own layer and its own full-canvas camera — see the note below. */
+const LAYER_UI = 0x4;
 
 export class Renderer {
   readonly engine: Engine;
   readonly scene: Scene;
-  readonly camera: ArcRotateCamera;
-  readonly wellRoot: TransformNode;
-
-  private readonly solidPool: Mesh[] = [];
-  private readonly ghostPool: Mesh[] = [];
-  private readonly guidePool: Mesh[] = [];
-  private readonly nextPool: Mesh[] = [];
-
-  private readonly solidMaster: Mesh;
-  private readonly ghostMaster: Mesh;
-  private readonly guideMaster: Mesh;
-  private readonly nextMaster: Mesh;
-
-  private readonly matByColor = new Map<number, StandardMaterial>();
+  readonly p1: PlayerView;
+  readonly p2: PlayerView;
+  readonly hud1: PlayerHud;
+  readonly hud2: PlayerHud;
 
   constructor(canvas: HTMLCanvasElement) {
     this.engine = new Engine(canvas, true, { stencil: true, antialias: true });
     this.scene = new Scene(this.engine);
     this.scene.clearColor = new Color4(0.015, 0.02, 0.038, 1);
 
-    this.wellRoot = new TransformNode("wellRoot", this.scene);
-
-    this.camera = new ArcRotateCamera(
-      "cam",
-      -Math.PI / 2,
-      1.15,
-      1.9,
-      new Vector3(0, WELL_ANCHOR.y + TANK_H * 0.5, 0),
-      this.scene
-    );
-    this.camera.attachControl(canvas, true);
-    // Arrow keys must control the piece, not orbit the camera — drop the
-    // camera's built-in keyboard input. Mouse drag still orbits (desktop only).
-    this.camera.inputs.removeByType("ArcRotateCameraKeyboardMoveInput");
-    this.camera.lowerRadiusLimit = 0.9;
-    this.camera.upperRadiusLimit = 5;
-    this.camera.wheelPrecision = 60;
+    // Viewports are normalised with the origin at the bottom-left.
+    this.p1 = new PlayerView(this.scene, LAYER_1P, new Viewport(0, 0, 0.5, 1));
+    this.p2 = new PlayerView(this.scene, LAYER_2P, new Viewport(0.5, 0, 0.5, 1));
 
     const hemi = new HemisphericLight("hemi", new Vector3(0.2, 1, 0.1), this.scene);
-    hemi.intensity = 0.7;
+    hemi.intensity = 0.75;
     hemi.groundColor = new Color3(0.08, 0.1, 0.18);
-    const dir = new DirectionalLight("dir", new Vector3(-0.4, -1, -0.6), this.scene);
-    dir.intensity = 0.8;
+    const dir = new DirectionalLight("dir", new Vector3(-0.3, -1, -0.45), this.scene);
+    dir.intensity = 0.7;
 
-    buildRoom(this.scene);
-    buildPedestal(this.scene, this.wellRoot);
-    buildTank(this.scene, this.wellRoot);
+    // A full-screen GUI renders once per active camera, clipped to that
+    // camera's viewport — with the two player cameras alone the HUD would be
+    // drawn twice, squashed into each half. Giving the UI its own layer and a
+    // third camera that owns the whole canvas puts it back on top, once.
+    const uiCamera = new FreeCamera("uiCam", Vector3.Zero(), this.scene);
+    uiCamera.layerMask = LAYER_UI;
+    uiCamera.viewport = new Viewport(0, 0, 1, 1);
+    uiCamera.inputs.clear();
 
-    this.solidMaster = this.makeMaster("solid", MeshBuilder.CreateBox("solid", { size: CELL * 0.9 }, this.scene));
+    this.scene.activeCameras = [this.p1.camera, this.p2.camera, uiCamera];
 
-    // Ghost: the landing preview. Brighter than a typical ghost because in VR
-    // it is doing most of the work of answering "where will this actually go".
-    this.ghostMaster = this.makeMaster("ghost", MeshBuilder.CreateBox("ghost", { size: CELL * 0.88 }, this.scene));
-    const gm = new StandardMaterial("ghostMat", this.scene);
-    gm.diffuseColor = new Color3(0.65, 0.75, 1);
-    gm.emissiveColor = new Color3(0.3, 0.4, 0.75);
-    gm.alpha = 0.38;
-    gm.disableDepthWrite = true;
-    this.ghostMaster.material = gm;
+    const ui = AdvancedDynamicTexture.CreateFullscreenUI("ui", true, this.scene);
+    ui.layer!.layerMask = LAYER_UI;
 
-    // Vertical guides from the live piece down to the ghost. This is the single
-    // biggest depth cue — it ties "the thing up there" to "the spot down there"
-    // so the player is not judging distance from perspective alone.
-    this.guideMaster = this.makeMaster(
-      "guide",
-      MeshBuilder.CreateBox("guide", { width: CELL * 0.13, height: 1, depth: CELL * 0.13 }, this.scene)
-    );
-    const gdm = new StandardMaterial("guideMat", this.scene);
-    gdm.diffuseColor = new Color3(0.55, 0.7, 1);
-    gdm.emissiveColor = new Color3(0.4, 0.55, 0.95);
-    gdm.alpha = 0.5;
-    gdm.disableDepthWrite = true;
-    this.guideMaster.material = gdm;
-
-    this.nextMaster = this.makeMaster(
-      "next",
-      MeshBuilder.CreateBox("next", { size: CELL * 0.55 }, this.scene)
-    );
-
-    this.buildNextPlinth();
-    this.placeForDesktop();
+    this.hud1 = new PlayerHud(ui, "left", "1P");
+    this.hud2 = new PlayerHud(ui, "right", "2P");
+    this.buildDivider(ui);
 
     window.addEventListener("resize", () => this.engine.resize());
     this.engine.runRenderLoop(() => this.scene.render());
   }
 
-  private makeMaster(_name: string, mesh: Mesh): Mesh {
-    mesh.isVisible = false;
-    mesh.isPickable = false;
-    mesh.parent = this.wellRoot;
-    return mesh;
+  private buildDivider(ui: AdvancedDynamicTexture): void {
+    const line = new Rectangle("divider");
+    line.width = "2px";
+    line.height = "92%";
+    line.thickness = 0;
+    line.background = "#243056";
+    line.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
+    ui.addControl(line);
   }
 
-  // Label + perch for the "next piece" cubes.
-  private buildNextPlinth(): void {
-    const plate = MeshBuilder.CreateBox(
-      "nextPlate",
-      { width: 0.11, height: 0.006, depth: 0.11 },
-      this.scene
-    );
-    plate.parent = this.wellRoot;
-    plate.position.set(NEXT_AT.x, NEXT_AT.y - 0.05, NEXT_AT.z);
-    plate.isPickable = false;
-    const m = new StandardMaterial("nextPlateMat", this.scene);
-    m.diffuseColor = new Color3(0.1, 0.13, 0.22);
-    m.emissiveColor = new Color3(0.05, 0.07, 0.14);
-    plate.material = m;
-  }
-
-  private solidMat(color: number): StandardMaterial {
-    let m = this.matByColor.get(color);
-    if (!m) {
-      m = new StandardMaterial("m" + color, this.scene);
-      const c = Color3.FromHexString("#" + color.toString(16).padStart(6, "0"));
-      m.diffuseColor = c;
-      m.emissiveColor = c.scale(0.35);
-      m.specularColor = new Color3(0.25, 0.25, 0.3);
-      this.matByColor.set(color, m);
-    }
-    return m;
-  }
-
-  private borrow(pool: Mesh[], master: Mesh, i: number): Mesh {
-    let mesh = pool[i];
-    if (!mesh) {
-      mesh = master.clone(master.name + "_" + pool.length, this.wellRoot)!;
-      mesh.isVisible = true;
-      pool.push(mesh);
-    }
-    mesh.setEnabled(true);
-    return mesh;
-  }
-
-  private hideFrom(pool: Mesh[], used: number): void {
-    for (let i = used; i < pool.length; i++) pool[i].setEnabled(false);
-  }
-
-  redraw(game: Game): void {
-    let s = 0;
-    const put = (x: number, y: number, z: number, color: number): void => {
-      const mesh = this.borrow(this.solidPool, this.solidMaster, s++);
-      mesh.position.copyFrom(cellToLocal(x, y, z));
-      mesh.material = this.solidMat(color);
-    };
-
-    game.grid.forEachFilled(put);
-    if (!game.gameOver)
-      for (const c of game.cells)
-        put(game.pos.x + c.x, game.pos.y + c.y, game.pos.z + c.z, game.current.color);
-    this.hideFrom(this.solidPool, s);
-
-    let g = 0;
-    let guides = 0;
-
-    if (!game.gameOver) {
-      const gp = game.ghostPos();
-      const drop = game.pos.y - gp.y;
-
-      for (const c of game.cells) {
-        const cx = game.pos.x + c.x;
-        const cz = game.pos.z + c.z;
-
-        // Ghost blocks at the landing height.
-        if (drop > 0) {
-          const mesh = this.borrow(this.ghostPool, this.ghostMaster, g++);
-          mesh.position.copyFrom(cellToLocal(gp.x + c.x, gp.y + c.y, gp.z + c.z));
-        }
-
-        // Guide pillar spanning the gap the piece still has to fall.
-        if (drop > 0) {
-          const top = cellToLocal(cx, game.pos.y + c.y, cz).y;
-          const bottom = cellToLocal(cx, gp.y + c.y, cz).y;
-          const mesh = this.borrow(this.guidePool, this.guideMaster, guides++);
-          mesh.position.set(cellToLocal(cx, 0, cz).x, (top + bottom) / 2, cellToLocal(cx, 0, cz).z);
-          mesh.scaling.y = Math.max(0.001, top - bottom);
-        }
-      }
-    }
-
-    this.hideFrom(this.ghostPool, g);
-    this.hideFrom(this.guidePool, guides);
-
-    this.drawNext(game);
-  }
-
-  private drawNext(game: Game): void {
-    const cells = game.next.cells;
-    const mid = (sel: (c: { x: number; y: number; z: number }) => number): number => {
-      const vals = cells.map(sel);
-      return (Math.min(...vals) + Math.max(...vals)) / 2;
-    };
-    const cx = mid((c) => c.x);
-    const cy = mid((c) => c.y);
-    const cz = mid((c) => c.z);
-    const S = CELL * 0.6;
-    const mat = this.solidMat(game.next.color);
-
-    let n = 0;
-    for (const c of cells) {
-      const mesh = this.borrow(this.nextPool, this.nextMaster, n++);
-      mesh.position.set(
-        NEXT_AT.x + (c.x - cx) * S,
-        NEXT_AT.y + (c.y - cy) * S,
-        NEXT_AT.z + (c.z - cz) * S
-      );
-      mesh.material = mat;
-    }
-    this.hideFrom(this.nextPool, n);
-  }
-
-  placeForDesktop(): void {
-    this.wellRoot.position.set(0, WELL_ANCHOR.y, 0);
-    this.wellRoot.rotation.y = 0;
-    this.camera.setTarget(new Vector3(0, WELL_ANCHOR.y + TANK_H * 0.5, 0));
-  }
-
-  /**
-   * Plant the tank an arm's length in front of wherever the player is actually
-   * standing and turn it to face them. Without this the tank lands wherever the
-   * headset's guardian origin happens to be, which is why it can end up behind
-   * you or halfway inside a wall.
-   */
-  placeForXR(headPos?: Vector3, forward?: Vector3): void {
-    if (!headPos || !forward) {
-      this.wellRoot.position.set(WELL_ANCHOR.x, WELL_ANCHOR.y, WELL_ANCHOR.z);
-      this.wellRoot.rotation.y = 0;
-      return;
-    }
-
-    const f = new Vector3(forward.x, 0, forward.z);
-    if (f.lengthSquared() < 1e-6) f.set(0, 0, -1);
-    f.normalize();
-
-    this.wellRoot.position.set(
-      headPos.x + f.x * XR_DISTANCE,
-      WELL_ANCHOR.y,
-      headPos.z + f.z * XR_DISTANCE
-    );
-    // Turn the tank's front face (where the panels live) back toward the player.
-    // Babylon's CreatePlane has normal (0,0,-1), so the panels face local -Z and
-    // the player must end up on the tank's -Z side: local +Z maps to world +f,
-    // which is atan2(f.x, f.z). Negating both arguments lands 180° out — the
-    // panels then render their unculled back face (mirrored text) and, far
-    // worse, every horizontal control comes out reversed because the grid is
-    // parented to this same node.
-    this.wellRoot.rotation.y = Math.atan2(f.x, f.z);
+  redraw(g1: Game, g2: Game): void {
+    this.p1.redraw(g1);
+    this.p2.redraw(g2);
+    this.hud1.update(g1);
+    this.hud2.update(g2);
   }
 }

@@ -1,44 +1,47 @@
-// ─── Game tuning ────────────────────────────────────────────────────────────
-// The well (pit) the pieces fall into. w = x axis, d = z axis, h = y (height).
-// 4x4x8 keeps a festival round short and, more importantly, keeps the depth
-// judgement tractable for someone who has never worn a headset before.
-// A deep well is the cheapest difficulty knob there is: it does not make the
-// game easier to understand, it just buys the player far more room to be bad
-// before the round ends. That is what a one-at-a-time booth queue needs.
-export const WELL = { w: 4, d: 4, h: 18 } as const;
+// ─── Game tuning (arcade 1v1) ───────────────────────────────────────────────
+// Diverged from the VR build: this is a two-player cabinet game played on one
+// screen, so rounds have to be short and both wells have to be readable at a
+// glance from a metre away.
 
-// Size of one cell cube in Babylon world units (metres in VR).
-// 18 layers have to fit between the pedestal and eye level, so the cell had to
-// shrink with the well: 0.075 puts the whole tank in view from a standing
-// position (see WELL_ANCHOR) at the cost of smaller blocks.
+// Ten layers rather than the VR build's eighteen. A versus round wants to be
+// decided in a minute or two, and a shallow well is what forces that.
+export const WELL = { w: 4, d: 4, h: 10 } as const;
+
+// One cell in Babylon world units. Arbitrary here — unlike the VR build these
+// are not metres, they only have to be consistent with the camera framing.
 export const CELL = 0.075;
 
-// Gravity: how long (ms) between automatic one-step drops, per level.
-// 30% slower than the previous pass across the board.
+// Gravity: milliseconds between automatic one-step drops.
+// NOTE: inherited from the VR build, where it was deliberately slowed for
+// first-timers in a headset. At 2000ms a piece takes ~20s to reach the floor
+// unaided, which is almost certainly too slow for a competitive round — see
+// the note in the handover. Left unchanged because the arcade pacing has not
+// been decided yet.
 export const BASE_DROP_MS = 2000;
 export const MIN_DROP_MS = 460;
-export const SOFT_DROP_MS = 100; // while soft-drop is held
-export const LEVEL_SPEEDUP_MS = 155; // shaved off BASE_DROP_MS per level
+export const SOFT_DROP_MS = 100;
+export const LEVEL_SPEEDUP_MS = 155;
 
-// How many cleared layers to advance a level.
 export const LAYERS_PER_LEVEL = 5;
-
-// Score awarded for clearing n layers at once (index = n).
 export const LAYER_SCORE = [0, 100, 300, 600, 1000, 1500];
 
-// ─── VR staging ─────────────────────────────────────────────────────────────
-// The tank sits on a pedestal like an aquarium on a table. `y` is the height of
-// the tank's BOTTOM off the floor; the pedestal fills the gap down to the floor.
-// bottom 0.18 + height 1.35 puts the rim at 1.53m — just under eye level, so
-// the whole shaft is in view without craning. A deeper well is mostly read
-// through the glass from the side now rather than straight down the top.
-export const WELL_ANCHOR = { x: 0, y: 0.18, z: -0.7 } as const;
+// ─── Split-screen staging ───────────────────────────────────────────────────
+// Both players share one canvas; each gets half of it and its own camera.
+// Player wells live at the same world position but on separate rendering
+// layers, so neither camera can see the other player's well.
+export const LAYER_1P = 0x1;
+export const LAYER_2P = 0x2;
 
-// How far in front of the player the tank is planted when a VR session starts
-// (and on every recenter).
-export const XR_DISTANCE = 0.7;
+// Top-down camera, Blockout style: the eye sits above the mouth of the well
+// looking straight down the shaft, so depth reads as perspective foreshortening
+// and the stack recedes below you.
+export const TOPDOWN = {
+  /** Height of the eye above the top of the well, in cell units. */
+  eyeCells: 6.5,
+  /** Vertical field of view in radians. Narrow keeps the shaft walls steep. */
+  fov: 0.9,
+} as const;
 
-// Minimum gap between two hard drops. Edge detection already reduces a trigger
-// pull to a single drop; this is the backstop for a trigger that chatters
-// across the press threshold, where one twitch could otherwise bury the well.
-export const HARD_DROP_COOLDOWN_MS = 250;
+// Width of the depth gauge beside each well, as a fraction of that player's
+// half of the screen.
+export const GAUGE_WIDTH_FRAC = 0.13;

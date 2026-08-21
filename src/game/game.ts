@@ -32,12 +32,12 @@ const KICKS: IVec3[] = [
 export class Game {
   readonly grid = new Grid();
 
-  readonly bag = new Bag();
+  readonly bag: Bag;
 
   current!: PieceDef;
   cells!: IVec3[]; // current rotated offsets
   pos!: IVec3; // pivot position in the well
-  next: PieceDef = this.bag.take(0);
+  next: PieceDef;
 
   score = 0;
   level = 1;
@@ -60,7 +60,18 @@ export class Game {
   /** Fired when a piece settles into the stack (for sound). */
   onLock: (() => void) | null = null;
 
-  constructor() {
+  /**
+   * `rand` is injectable so a round can be replayed, and so both cabinets could
+   * later run off one seeded stream. Note that seeding both players identically
+   * does NOT by itself hand them the same pieces: bag composition is
+   * score-driven, the two scores diverge, and from the first tier change on the
+   * two streams are consumed at different rates. Making versus truly fair needs
+   * a shared sequence, which in turn needs the tier trigger to stop depending
+   * on per-player score.
+   */
+  constructor(rand: () => number = Math.random) {
+    this.bag = new Bag(rand);
+    this.next = this.bag.take(0);
     this.spawn();
   }
 

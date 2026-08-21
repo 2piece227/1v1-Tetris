@@ -24,6 +24,17 @@ export class Grid {
     return this.get(x, y, z) !== EMPTY;
   }
 
+  /** How many of a layer's w*d cells are occupied. Drives the depth gauge. */
+  layerFill(y: number): number {
+    let n = 0;
+    for (let z = 0; z < d; z++)
+      for (let x = 0; x < w; x++) if (this.isFilled(x, y, z)) n++;
+    return n;
+  }
+
+  /** Cells in one layer, for turning layerFill into a fraction. */
+  static readonly LAYER_CELLS = w * d;
+
   // Can these piece cells (offsets) sit at world position `pos`?
   canPlace(cells: IVec3[], pos: IVec3): boolean {
     for (const cell of cells) {

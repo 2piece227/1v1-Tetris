@@ -1,12 +1,12 @@
 {
-  "name": "vr-blockout-tetris",
+  "name": "arcade-blockout-versus",
   "version": "0.1.0",
-  "description": "Blockout-style 3D Tetris for Meta Quest 3 (WebXR + Babylon.js)",
+  "description": "Split-screen 1v1 Blockout-style 3D Tetris for a local arcade cabinet",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --port 5174",
     "build": "tsc && vite build",
-    "preview": "vite preview --host"
+    "preview": "vite preview --port 5174 --host"
   },
   "devDependencies": {
     "typescript": "^5.6.3",
