@@ -23,13 +23,17 @@
         padding: 0 5px; font-family: inherit; font-size: 11px; color: #cdd5ff;
       }
 
-      #banner {
+      /* Start card and win card share styling; only one is ever shown. */
+      #start, #banner {
         position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
         flex-direction: column; gap: 20px; background: rgba(4,6,12,0.78); color: #fff; text-align: center;
       }
-      #banner.show { display: flex; }
+      #start.show, #banner.show { display: flex; }
       #bannerText { font-size: 64px; font-weight: 800; letter-spacing: 2px; }
-      #banner button {
+      #start h1 { font-size: 68px; font-weight: 800; letter-spacing: 4px; color: #eef2ff; }
+      #start p { color: #9aa5d4; font-size: 16px; line-height: 1.9; }
+      #start .keys { color: #7c8bff; font-weight: 700; }
+      #banner button, #start button {
         font-size: 18px; font-weight: 700; color: #05060a; background: #7c8bff;
         border: none; border-radius: 10px; padding: 14px 34px; cursor: pointer;
       }
@@ -49,6 +53,15 @@
       <b>2P</b> 이동 <kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd> &nbsp;
       회전 <kbd>U</kbd><kbd>I</kbd><kbd>O</kbd><br />
       떨구기 <kbd>Enter</kbd> &nbsp; 천천히 <kbd>R-Shift</kbd>
+    </div>
+
+    <div id="start" class="show">
+      <h1>게임 시작</h1>
+      <p>
+        1P <span class="keys">Space</span> &nbsp;·&nbsp; 2P <span class="keys">Enter</span><br />
+        아무 쪽이나 누르면 시작합니다
+      </p>
+      <button id="startBtn">시작</button>
     </div>
 
     <div id="banner">

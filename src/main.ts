@@ -4,6 +4,7 @@ import { attachKeyboard } from "./input/keyboard";
 import { Renderer } from "./render/renderer";
 
 const canvas = document.getElementById("renderCanvas") as HTMLCanvasElement;
+const startCard = document.getElementById("start") as HTMLElement;
 const banner = document.getElementById("banner") as HTMLElement;
 const bannerText = document.getElementById("bannerText") as HTMLElement;
 
@@ -14,7 +15,9 @@ const p1 = new Game();
 const p2 = new Game();
 const players = [p1, p2];
 
-let roundOver = false;
+/** ready: start card up · playing: live · over: win card up */
+type Phase = "ready" | "playing" | "over";
+let phase: Phase = "ready";
 
 function draw(): void {
   renderer.redraw(p1, p2);
@@ -40,13 +43,30 @@ function sendAttack(_attacker: Game, _victim: Game, _layers: number): void {
   /* undecided — see above */
 }
 
+function startRound(): void {
+  if (phase === "playing") return;
+  for (const g of players) g.reset();
+  startCard.classList.remove("show");
+  banner.classList.remove("show");
+  phase = "playing";
+  draw();
+}
+
 function endRound(loser: Game): void {
-  if (roundOver) return;
-  roundOver = true;
-  const winner = loser === p1 ? "2P" : "1P";
-  bannerText.textContent = `${winner} 승리`;
+  if (phase !== "playing") return;
+  phase = "over";
+  bannerText.textContent = `${loser === p1 ? "2P" : "1P"} 승리`;
   banner.classList.add("show");
   sfx.gameOver();
+}
+
+/** Back to the start card, so the next pair at the cabinet sees it. */
+function toStartCard(): void {
+  phase = "ready";
+  banner.classList.remove("show");
+  startCard.classList.add("show");
+  for (const g of players) g.reset();
+  draw();
 }
 
 for (const me of players) {
@@ -62,25 +82,27 @@ for (const me of players) {
   me.onGameOver = () => endRound(me);
 }
 
-function restart(): void {
-  roundOver = false;
-  banner.classList.remove("show");
-  for (const g of players) g.reset();
-  draw();
-}
+attachKeyboard(p1, p2, sfx, () => phase === "playing");
 
-window.addEventListener("keydown", (e) => {
-  // F5 would reload the page and lose the cabinet's fullscreen window.
-  if (e.code === "F5") e.preventDefault();
-  if (roundOver && e.code === "F1") restart();
+// Start on keyUP, not keydown: the keydown that dismisses the card would
+// otherwise fall straight through to the freshly-enabled bindings and hard drop
+// the first piece the instant the round begins.
+window.addEventListener("keyup", (e) => {
+  if (e.code === "F5") return;
+  if (phase === "ready" && (e.code === "Space" || e.code === "Enter")) startRound();
+  else if (phase === "over" && (e.code === "Space" || e.code === "Enter")) toStartCard();
 });
-document.getElementById("restartBtn")!.addEventListener("click", restart);
+window.addEventListener("keydown", (e) => {
+  // F5 would reload and lose the cabinet's fullscreen window.
+  if (e.code === "F5") e.preventDefault();
+});
 
-attachKeyboard(p1, p2, sfx);
+document.getElementById("startBtn")!.addEventListener("click", startRound);
+document.getElementById("restartBtn")!.addEventListener("click", toStartCard);
 
 // Gravity for both wells, off one clock.
 renderer.scene.onBeforeRenderObservable.add(() => {
-  if (roundOver) return;
+  if (phase !== "playing") return;
   const dt = renderer.engine.getDeltaTime();
   for (const g of players) g.tick(dt);
 });

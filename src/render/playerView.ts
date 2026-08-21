@@ -10,7 +10,7 @@ import {
   Vector3,
   Viewport,
 } from "@babylonjs/core";
-import { CELL, TOPDOWN, WELL } from "../config";
+import { CELL, TOPDOWN, WELL, layerColor } from "../config";
 import type { Game } from "../game/game";
 
 const { w, d, h } = WELL;
@@ -39,9 +39,11 @@ export class PlayerView {
   readonly camera: FreeCamera;
 
   private readonly solidPool: Mesh[] = [];
+  private readonly piecePool: Mesh[] = [];
   private readonly ghostPool: Mesh[] = [];
   private readonly guidePool: Mesh[] = [];
   private readonly solidMaster: Mesh;
+  private readonly pieceMaster: Mesh;
   private readonly ghostMaster: Mesh;
   private readonly guideMaster: Mesh;
   private readonly matByColor = new Map<number, StandardMaterial>();
@@ -68,9 +70,26 @@ export class PlayerView {
     this.camera.layerMask = mask;
     this.camera.inputs.clear(); // fixed shot; a cabinet has no camera controls
 
+    // Settled blocks: solid, and coloured by depth rather than by piece.
     this.solidMaster = this.master(
       MeshBuilder.CreateBox("solid", { size: CELL * 0.9 }, scene)
     );
+
+    // The live piece is a hollow cage. Seen from directly above, a solid piece
+    // sits on top of everything it is about to land on and hides exactly the
+    // part of the well the player needs to judge. Edges only, interior clear.
+    this.pieceMaster = this.master(
+      MeshBuilder.CreateBox("piece", { size: CELL * 0.94 }, scene)
+    );
+    const pm = new StandardMaterial("pieceMat", scene);
+    pm.diffuseColor = new Color3(1, 1, 1);
+    pm.emissiveColor = new Color3(1, 1, 1);
+    // Not fully zero: the mesh still has to be submitted for the edge pass to
+    // run, and a hint of fill keeps the cage from reading as flat line art.
+    pm.alpha = 0.05;
+    pm.disableDepthWrite = true;
+    this.pieceMaster.material = pm;
+    this.edged(this.pieceMaster);
 
     this.ghostMaster = this.master(
       MeshBuilder.CreateBox("ghost", { size: CELL * 0.88 }, scene)
@@ -78,7 +97,7 @@ export class PlayerView {
     const gm = new StandardMaterial("ghostMat", scene);
     gm.diffuseColor = new Color3(0.65, 0.75, 1);
     gm.emissiveColor = new Color3(0.3, 0.4, 0.75);
-    gm.alpha = 0.35;
+    gm.alpha = 0.22;
     gm.disableDepthWrite = true;
     this.ghostMaster.material = gm;
 
@@ -95,7 +114,7 @@ export class PlayerView {
     const gdm = new StandardMaterial("guideMat", scene);
     gdm.diffuseColor = new Color3(0.55, 0.7, 1);
     gdm.emissiveColor = new Color3(0.4, 0.55, 0.95);
-    gdm.alpha = 0.45;
+    gdm.alpha = 0.4;
     gdm.disableDepthWrite = true;
     this.guideMaster.material = gdm;
 
@@ -107,6 +126,14 @@ export class PlayerView {
     mesh.isPickable = false;
     mesh.layerMask = this.mask;
     mesh.parent = this.root;
+    return mesh;
+  }
+
+  /** Bright cage outline. Clones do not inherit an edges renderer. */
+  private edged(mesh: Mesh): Mesh {
+    mesh.enableEdgesRendering();
+    mesh.edgesWidth = 5;
+    mesh.edgesColor = new Color4(1, 1, 1, 1);
     return mesh;
   }
 
@@ -136,9 +163,7 @@ export class PlayerView {
     };
 
     for (let layer = 0; layer <= h; layer++) {
-      // Brightest at the mouth, dimmest at the floor — a second depth cue
-      // layered on top of the perspective one.
-      ring((layer * CELL), 0.35 + 0.65 * (layer / h));
+      ring(layer * CELL, 0.35 + 0.65 * (layer / h));
     }
 
     const corners: [number, number][] = [
@@ -152,7 +177,6 @@ export class PlayerView {
       colors.push([new Color4(0.2, 0.3, 0.6, 1), new Color4(0.45, 0.6, 1, 1)]);
     }
 
-    // Floor grid, so an empty well still reads as having a bottom.
     const floor = new Color4(0.22, 0.3, 0.55, 1);
     for (let x = 0; x <= w; x++) {
       lines.push([
@@ -185,19 +209,20 @@ export class PlayerView {
       m = new StandardMaterial("m" + color, this.scene);
       const c = Color3.FromHexString("#" + color.toString(16).padStart(6, "0"));
       m.diffuseColor = c;
-      m.emissiveColor = c.scale(0.35);
+      m.emissiveColor = c.scale(0.4);
       m.specularColor = new Color3(0.25, 0.25, 0.3);
       this.matByColor.set(color, m);
     }
     return m;
   }
 
-  private borrow(pool: Mesh[], master: Mesh, i: number): Mesh {
+  private borrow(pool: Mesh[], master: Mesh, i: number, edges = false): Mesh {
     let mesh = pool[i];
     if (!mesh) {
       mesh = master.clone(master.name + "_" + pool.length, this.root)!;
       mesh.isVisible = true;
       mesh.layerMask = this.mask;
+      if (edges) this.edged(mesh);
       pool.push(mesh);
     }
     mesh.setEnabled(true);
@@ -209,25 +234,29 @@ export class PlayerView {
   }
 
   redraw(game: Game): void {
+    // Settled stack, coloured by depth.
     let s = 0;
-    const put = (x: number, y: number, z: number, color: number): void => {
+    game.grid.forEachFilled((x, y, z) => {
       const mesh = this.borrow(this.solidPool, this.solidMaster, s++);
       mesh.position.copyFrom(cellToLocal(x, y, z));
-      mesh.material = this.solidMat(color);
-    };
-
-    game.grid.forEachFilled(put);
-    if (!game.gameOver)
-      for (const c of game.cells)
-        put(game.pos.x + c.x, game.pos.y + c.y, game.pos.z + c.z, game.current.color);
+      mesh.material = this.solidMat(layerColor(y));
+    });
     this.hideFrom(this.solidPool, s);
 
+    let p = 0;
     let g = 0;
     let guides = 0;
+
     if (!game.gameOver) {
+      for (const c of game.cells) {
+        const cage = this.borrow(this.piecePool, this.pieceMaster, p++, true);
+        cage.position.copyFrom(
+          cellToLocal(game.pos.x + c.x, game.pos.y + c.y, game.pos.z + c.z)
+        );
+      }
+
       const gp = game.ghostPos();
-      const drop = game.pos.y - gp.y;
-      if (drop > 0) {
+      if (game.pos.y - gp.y > 0) {
         for (const c of game.cells) {
           const cx = game.pos.x + c.x;
           const cz = game.pos.z + c.z;
@@ -244,6 +273,8 @@ export class PlayerView {
         }
       }
     }
+
+    this.hideFrom(this.piecePool, p);
     this.hideFrom(this.ghostPool, g);
     this.hideFrom(this.guidePool, guides);
   }

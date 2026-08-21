@@ -51,7 +51,7 @@ export const P2_KEYS: Binding = {
   softDrop: "ShiftRight",
 };
 
-function bind(game: Game, keys: Binding, sfx: Sfx): void {
+function bind(game: Game, keys: Binding, sfx: Sfx, enabled: () => boolean): void {
   window.addEventListener("keydown", (e) => {
     if (e.repeat && e.code !== keys.softDrop) {
       // Held keys must not machine-gun. Auto-repeat on hard drop buries the
@@ -62,6 +62,7 @@ function bind(game: Game, keys: Binding, sfx: Sfx): void {
       return;
     }
     sfx.unlock();
+    if (!enabled()) return; // start card is up, or the round is decided
     let used = true;
     switch (e.code) {
       case keys.moveLeft: game.tryMove(-1, 0); break;
@@ -83,7 +84,16 @@ function bind(game: Game, keys: Binding, sfx: Sfx): void {
   });
 }
 
-export function attachKeyboard(p1: Game, p2: Game, sfx: Sfx): void {
-  bind(p1, P1_KEYS, sfx);
-  bind(p2, P2_KEYS, sfx);
+/**
+ * `enabled` gates play so the start card and the win card can swallow input
+ * without the bindings having to know anything about game phase.
+ */
+export function attachKeyboard(
+  p1: Game,
+  p2: Game,
+  sfx: Sfx,
+  enabled: () => boolean
+): void {
+  bind(p1, P1_KEYS, sfx, enabled);
+  bind(p2, P2_KEYS, sfx, enabled);
 }

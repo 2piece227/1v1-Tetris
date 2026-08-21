@@ -12,7 +12,7 @@ import {
 import { AdvancedDynamicTexture, Control, Rectangle } from "@babylonjs/gui";
 import { LAYER_1P, LAYER_2P } from "../config";
 import type { Game } from "../game/game";
-import { PlayerHud } from "./playerHud";
+import { Hud } from "./hud";
 import { PlayerView } from "./playerView";
 
 /** UI gets its own layer and its own full-canvas camera — see the note below. */
@@ -23,8 +23,7 @@ export class Renderer {
   readonly scene: Scene;
   readonly p1: PlayerView;
   readonly p2: PlayerView;
-  readonly hud1: PlayerHud;
-  readonly hud2: PlayerHud;
+  readonly hud: Hud;
 
   constructor(canvas: HTMLCanvasElement) {
     this.engine = new Engine(canvas, true, { stencil: true, antialias: true });
@@ -55,8 +54,7 @@ export class Renderer {
     const ui = AdvancedDynamicTexture.CreateFullscreenUI("ui", true, this.scene);
     ui.layer!.layerMask = LAYER_UI;
 
-    this.hud1 = new PlayerHud(ui, "left", "1P");
-    this.hud2 = new PlayerHud(ui, "right", "2P");
+    this.hud = new Hud(ui);
     this.buildDivider(ui);
 
     window.addEventListener("resize", () => this.engine.resize());
@@ -66,7 +64,7 @@ export class Renderer {
   private buildDivider(ui: AdvancedDynamicTexture): void {
     const line = new Rectangle("divider");
     line.width = "2px";
-    line.height = "92%";
+    line.height = "78%";
     line.thickness = 0;
     line.background = "#243056";
     line.horizontalAlignment = Control.HORIZONTAL_ALIGNMENT_CENTER;
@@ -76,7 +74,6 @@ export class Renderer {
   redraw(g1: Game, g2: Game): void {
     this.p1.redraw(g1);
     this.p2.redraw(g2);
-    this.hud1.update(g1);
-    this.hud2.update(g2);
+    this.hud.update(g1, g2);
   }
 }

@@ -5,7 +5,7 @@
 
 // Ten layers rather than the VR build's eighteen. A versus round wants to be
 // decided in a minute or two, and a shallow well is what forces that.
-export const WELL = { w: 4, d: 4, h: 10 } as const;
+export const WELL = { w: 4, d: 4, h: 7 } as const;
 
 // One cell in Babylon world units. Arbitrary here — unlike the VR build these
 // are not metres, they only have to be consistent with the camera framing.
@@ -42,6 +42,24 @@ export const TOPDOWN = {
   fov: 0.9,
 } as const;
 
-// Width of the depth gauge beside each well, as a fraction of that player's
-// half of the screen.
-export const GAUGE_WIDTH_FRAC = 0.13;
+// ─── Layer colours ──────────────────────────────────────────────────────────
+// A settled block is coloured by the layer it sits in, not by the piece it came
+// from. Looking straight down the shaft everything overlaps, so a fixed colour
+// per depth is what lets a player tell at a glance how high the stack has got —
+// this is the job the side gauge used to do, moved into the well itself.
+//
+// Rainbow bottom to top: index 0 is the floor (red), index 6 the mouth (violet).
+export const LAYER_COLORS = [
+  0xff3b30, // 1 빨
+  0xff9500, // 2 주
+  0xffd60a, // 3 노
+  0x34c759, // 4 초
+  0x0a84ff, // 5 파
+  0x5e5ce6, // 6 남
+  0xbf5af2, // 7 보
+] as const;
+
+/** Colour for a settled cell at grid height y, clamped for safety. */
+export function layerColor(y: number): number {
+  return LAYER_COLORS[Math.min(Math.max(y, 0), LAYER_COLORS.length - 1)];
+}
