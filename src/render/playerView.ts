@@ -212,9 +212,12 @@ export class PlayerView {
     if (!m) {
       m = new StandardMaterial("m" + color, this.scene);
       const c = Color3.FromHexString("#" + color.toString(16).padStart(6, "0"));
-      m.diffuseColor = c;
-      m.emissiveColor = c.scale(0.4);
-      m.specularColor = new Color3(0.25, 0.25, 0.3);
+      // Kept dark on purpose. These cubes are stacked several deep under a
+      // white wireframe piece, and at full brightness the near layers glare
+      // enough to wash out the hue differences between them.
+      m.diffuseColor = c.scale(0.62);
+      m.emissiveColor = c.scale(0.1);
+      m.specularColor = new Color3(0.08, 0.08, 0.1);
       this.matByColor.set(color, m);
     }
     return m;

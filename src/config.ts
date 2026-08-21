@@ -50,13 +50,13 @@ export const TOPDOWN = {
 //
 // Rainbow bottom to top: index 0 is the floor (red), index 6 the mouth (violet).
 export const LAYER_COLORS = [
-  0xff3b30, // 1 빨
-  0xff9500, // 2 주
-  0xffd60a, // 3 노
-  0x34c759, // 4 초
-  0x0a84ff, // 5 파
-  0x5e5ce6, // 6 남
-  0xbf5af2, // 7 보
+  0xff1e1e, // 1 빨
+  0xff6a00, // 2 주  — pushed red-ward; the old #ff9500 sat too near the yellow
+  0xf5f000, // 3 노  — purer and lighter, so it separates from orange by value
+  0x21c74a, // 4 초
+  0x1f7bff, // 5 파
+  0x3d2fb5, // 6 남  — clearly darker than the blue above it
+  0xa83fd4, // 7 보
 ] as const;
 
 /** Colour for a settled cell at grid height y, clamped for safety. */
