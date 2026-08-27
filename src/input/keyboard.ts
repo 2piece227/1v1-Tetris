@@ -5,7 +5,7 @@ import type { Game } from "../game/game";
  * Two players on one keyboard.
  *
  * The layout assumes a cabinet panel per player: a four-way stick for movement
- * plus five buttons. That is nine inputs, which fits a standard arcade panel —
+ * plus four buttons. That is eight inputs, which fits a standard arcade panel —
  * the VR build's six rotation directions would not. Each axis therefore gets a
  * single button that always turns the same way; press it four times to come
  * back round. A USB arcade encoder presents itself as a keyboard, so these are
@@ -24,7 +24,6 @@ interface Binding {
   rotY: string;
   rotZ: string;
   hardDrop: string;
-  softDrop: string;
 }
 
 export const P1_KEYS: Binding = {
@@ -36,7 +35,6 @@ export const P1_KEYS: Binding = {
   rotY: "KeyE",
   rotZ: "KeyR",
   hardDrop: "Space",
-  softDrop: "ShiftLeft",
 };
 
 export const P2_KEYS: Binding = {
@@ -48,17 +46,16 @@ export const P2_KEYS: Binding = {
   rotY: "KeyI",
   rotZ: "KeyO",
   hardDrop: "Enter",
-  softDrop: "ShiftRight",
 };
 
 function bind(game: Game, keys: Binding, sfx: Sfx, enabled: () => boolean): void {
   window.addEventListener("keydown", (e) => {
-    if (e.repeat && e.code !== keys.softDrop) {
+    if (e.repeat) {
       // Held keys must not machine-gun. Auto-repeat on hard drop buries the
       // well in one press; on rotation it spins the piece past where you
       // wanted it. Movement is the one place a repeat would be useful, and it
       // is dropped too so that every binding behaves the same way.
-      if (e.code !== keys.softDrop) e.preventDefault();
+      e.preventDefault();
       return;
     }
     sfx.unlock();
@@ -73,14 +70,9 @@ function bind(game: Game, keys: Binding, sfx: Sfx, enabled: () => boolean): void
       case keys.rotY: game.tryRotate("y", 1); break;
       case keys.rotZ: game.tryRotate("z", 1); break;
       case keys.hardDrop: game.hardDrop(); break;
-      case keys.softDrop: game.softDropping = true; break;
       default: used = false;
     }
     if (used) e.preventDefault();
-  });
-
-  window.addEventListener("keyup", (e) => {
-    if (e.code === keys.softDrop) game.softDropping = false;
   });
 }
 

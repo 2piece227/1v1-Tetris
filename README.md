@@ -31,7 +31,7 @@ chrome.exe --app=http://localhost:5174 --start-fullscreen
 
 ## 조작
 
-아케이드 패널 기준으로 **4방향 스틱 + 버튼 5개 = 9개 입력**만 쓴다.
+아케이드 패널 기준으로 **4방향 스틱 + 버튼 4개 = 8개 입력**만 쓴다.
 회전은 축마다 버튼 하나로 한 방향씩만 돈다(4번 누르면 제자리).
 
 | | 1P | 2P |
@@ -39,7 +39,6 @@ chrome.exe --app=http://localhost:5174 --start-fullscreen
 | 이동 | <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> | 방향키 |
 | 회전 X / Y / Z | <kbd>Q</kbd> <kbd>E</kbd> <kbd>R</kbd> | <kbd>U</kbd> <kbd>I</kbd> <kbd>O</kbd> |
 | 하드 드롭 | <kbd>Space</kbd> | <kbd>Enter</kbd> |
-| 소프트 드롭 | <kbd>L-Shift</kbd> | <kbd>R-Shift</kbd> |
 | 시작 / 재시작 | <kbd>Space</kbd> 또는 <kbd>Enter</kbd> | |
 
 키 바인딩은 `event.key`가 아니라 **`event.code`** 기준이다. 기기가 다른 자판

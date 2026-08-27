@@ -19,7 +19,6 @@ export const CELL = 0.075;
 // been decided yet.
 export const BASE_DROP_MS = 2000;
 export const MIN_DROP_MS = 460;
-export const SOFT_DROP_MS = 100;
 export const LEVEL_SPEEDUP_MS = 155;
 
 export const LAYERS_PER_LEVEL = 5;

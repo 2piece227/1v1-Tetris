@@ -4,7 +4,6 @@ import {
   LAYER_SCORE,
   LEVEL_SPEEDUP_MS,
   MIN_DROP_MS,
-  SOFT_DROP_MS,
   WELL,
 } from "../config";
 import { Bag } from "./bag";
@@ -43,7 +42,6 @@ export class Game {
   level = 1;
   layers = 0;
   gameOver = false;
-  softDropping = false;
 
   private dropTimer = 0;
 
@@ -183,8 +181,7 @@ export class Game {
   tick(dtMs: number): void {
     if (this.gameOver) return;
     this.dropTimer += dtMs;
-    const interval = this.softDropping ? SOFT_DROP_MS : this.dropInterval();
-    if (this.dropTimer >= interval) {
+    if (this.dropTimer >= this.dropInterval()) {
       this.dropTimer = 0;
       if (!this.descend()) this.lock();
       else this.onChange?.();
@@ -197,7 +194,6 @@ export class Game {
     this.level = 1;
     this.layers = 0;
     this.gameOver = false;
-    this.softDropping = false;
     this.bag.reset();
     this.next = this.bag.take(0);
     this.spawn();
