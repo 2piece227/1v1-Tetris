@@ -1,55 +1,79 @@
-# VR 블럭아웃 · 3D 테트리스 (Meta Quest 3)
+# 블럭아웃 대전 · 1P vs 2P
 
-Babylon.js + WebXR로 만든 블럭아웃 방식 3D 테트리스. 정육면체 우물(pit)에
-조각이 떨어지고 X/Y/Z 세 축으로 회전시키며, 한 층이 가득 차면 사라진다.
-Quest 3 브라우저에서 URL만 열면 실행되므로 앱 설치·사이드로드가 필요 없다.
+한 화면을 좌우로 나눠 두 명이 겨루는 블럭아웃 방식 3D 테트리스.
+축제 부스의 아케이드 게임기용으로, 로컬에서 키보드(또는 USB 아케이드 인코더)
+두 세트로 돌아간다.
+
+머리 위에서 우물을 수직으로 내려다보는 **탑다운 시점**이고, 깊이는 원근
+축소로 읽는다. 층 경계마다 사각 링을 그려서 위에서 보면 안쪽으로 겹쳐 들어간다.
+
+> VR 1인용판은 별도 저장소: [2piece227/Tetris](https://github.com/2piece227/Tetris)
+> 게임 로직(`src/game/`)은 두 저장소가 같고, 렌더링·입력만 다르다.
+> **로직 버그는 양쪽에 각각 고쳐야 한다.**
 
 ## 실행
 
 ```bash
 npm install
-npm run dev        # http://localhost:5173  (LAN에도 노출됨 → Quest 브라우저로 접속)
+npm run dev        # http://localhost:5174
 ```
 
-Quest 3에서 플레이하려면 같은 Wi-Fi에서 헤드셋 브라우저로 PC의 LAN 주소
-(`http://<PC-IP>:5173`)를 열고 우하단 고글 버튼을 누른다.
-※ WebXR은 **HTTPS**가 필요하다. 실제 배포는 아래 참고.
+## 아케이드 게임기 설정
 
-## 배포 (GitHub Pages, HTTPS 자동)
+주소창 없는 창으로 띄우려면 바로가기 하나면 된다.
 
 ```bash
-npm run build      # dist/ 생성
-# dist/ 내용을 gh-pages 브랜치나 Pages 설정 경로에 올림
+chrome.exe --app=http://localhost:5174 --start-fullscreen
 ```
+
+`--kiosk` 대신 `--app`을 쓰는 이유는 창 크기·위치를 직접 지정할 수 있어서다.
+게임 중 <kbd>F5</kbd>는 막아뒀다(전체화면 창이 날아가는 사고 방지).
 
 ## 조작
 
-| | 키보드(데스크톱) | VR(Quest 컨트롤러) |
+아케이드 패널 기준으로 **4방향 스틱 + 버튼 5개 = 9개 입력**만 쓴다.
+회전은 축마다 버튼 하나로 한 방향씩만 돈다(4번 누르면 제자리).
+
+| | 1P | 2P |
 |---|---|---|
-| 이동 X/Z | ← → ↑ ↓ | 왼쪽 스틱 |
-| 회전 X축 | Q / W | 오른쪽 스틱 상하 |
-| 회전 Y축 | A / S | 오른쪽 스틱 좌우 |
-| 회전 Z축 | Z / X | A / B 버튼 |
-| 하드 드롭 | Space | 오른쪽 트리거 |
-| 소프트 드롭 | Shift(홀드) | 왼쪽 그립/트리거 |
-| 위치 재조정 | — | 왼쪽 X 버튼 |
+| 이동 | <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> | 방향키 |
+| 회전 X / Y / Z | <kbd>Q</kbd> <kbd>E</kbd> <kbd>R</kbd> | <kbd>U</kbd> <kbd>I</kbd> <kbd>O</kbd> |
+| 하드 드롭 | <kbd>Space</kbd> | <kbd>Enter</kbd> |
+| 소프트 드롭 | <kbd>L-Shift</kbd> | <kbd>R-Shift</kbd> |
+| 시작 / 재시작 | <kbd>Space</kbd> 또는 <kbd>Enter</kbd> | |
 
-VR 조작법은 씬 안의 패널에도 떠 있다. **DOM으로 만든 UI는 헤드셋에서 보이지
-않는다** — immersive 세션에 들어가면 브라우저가 WebXR 프레임버퍼만 그리고 HTML
-페이지는 사라지기 때문이다. 그래서 점수·조작법·게임오버는 전부 Babylon GUI
-평면([`src/render/vrui.ts`](src/render/vrui.ts))으로 씬 안에 들어가 있고,
-index.html에 남은 것은 데스크톱 전용 키보드 안내뿐이다.
+키 바인딩은 `event.key`가 아니라 **`event.code`** 기준이다. 기기가 다른 자판
+배열로 부팅해도 패널 버튼의 의미가 바뀌지 않는다.
+바꾸려면 [`src/input/keyboard.ts`](src/input/keyboard.ts)의 `P1_KEYS` / `P2_KEYS`.
 
-## 배치
+## 옆의 층 게이지
 
-우물은 받침대 위에 놓인 유리 수조다(44cm 폭, 윗면 테두리가 바닥에서 1.28m).
-눈높이보다 낮아서 자연스럽게 내려다보게 되고, 유리벽 덕분에 옆에서도 쌓인
-높이가 보인다. VR 세션을 시작하거나 왼쪽 X를 누르면 플레이어 앞
-[`XR_DISTANCE`](src/config.ts)만큼 떨어진 곳으로 수조가 다시 놓인다.
+블럭아웃이 우물 옆에 붙여둔 그 표시. 장식이 아니라 **필수**다 — 수직으로
+내려다보면 꽉 찬 층과 세 칸 아래 빈 층이 화면상 같은 몇 픽셀이라, 각 층이
+얼마나 찼는지 읽을 수 있는 유일한 수단이다. 한 칸 남은 층은 색이 따로 뜬다.
+
+## 미정: 공격 규칙
+
+한쪽이 층을 지웠을 때 상대에게 무엇을 보낼지는 아직 정하지 않았다.
+[`src/main.ts`](src/main.ts)의 `sendAttack()`에 비워둔 훅이 있고, 후보는 둘이다.
+
+1. **무작위 구멍** — 일반 테트리스처럼 한 칸 빠진 층을 밀어 넣되 구멍 위치가 매번 다르다.
+2. **같은 열 구멍** — 연속 공격이 같은 열에 쌓여 상대 우물에 세로 통로가 생긴다.
+
+2번은 연속 클리어를 보상하고 그림이 재밌게 나오지만, 받는 쪽이 긴 조각 하나로
+정리하기 쉬워질 수 있다. `victim.grid`만 건드리면 되고, 층을 밀어 올리는 로직은
+`Grid`에 이미 있다.
 
 ## 튜닝
 
-- 우물 크기(4×4×8)·낙하 속도·점수·배치: [`src/config.ts`](src/config.ts)
-- 조각 세트: [`src/game/pieces.ts`](src/game/pieces.ts)
-- 방·수조·받침대: [`src/render/environment.ts`](src/render/environment.ts)
-- 효과음(WebAudio 합성, 에셋 없음): [`src/audio/sfx.ts`](src/audio/sfx.ts)
+- 우물 크기(4×4×10)·낙하 속도·점수: [`src/config.ts`](src/config.ts)
+- 조각 세트와 점수별 가방 구성: [`src/game/pieces.ts`](src/game/pieces.ts)
+- 탑다운 카메라 높이·화각: `TOPDOWN` in [`src/config.ts`](src/config.ts)
+
+> 낙하 속도는 VR판에서 그대로 가져온 값이라 대전용으로는 느릴 수 있다
+> (`BASE_DROP_MS = 2000`이면 조각 하나가 바닥까지 20초). 부스에서 재보고 조정할 것.
+
+## 배포
+
+`main`에 푸시하면 GitHub Actions가 `dist/`를 빌드해 Pages에 올린다.
+`vite.config.ts`의 `base: "./"` 덕분에 어떤 하위 경로에서도 그대로 동작한다.
