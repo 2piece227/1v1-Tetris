@@ -26,11 +26,11 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      # Requires Pages to already be switched on for the repo, with its source
+      # set to GitHub Actions. The token this workflow runs under cannot turn it
+      # on itself — enablement: true was tried here and fails with the default
+      # GITHUB_TOKEN, so it stays a one-time manual step per repository.
       - uses: actions/configure-pages@v5
-        # Turns Pages on for the repo if it is not already, so a fresh clone of
-        # this workflow deploys without anyone visiting Settings first.
-        with:
-          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist
