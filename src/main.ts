@@ -43,23 +43,16 @@ function draw(): void {
 }
 
 /**
- * ATTACK HOOK — deliberately empty.
+ * Clearing `a` layers sends `a` layers at the opponent.
  *
- * Two candidate rules are still on the table and they produce different games:
- *
- *   a) Classic: clearing n layers pushes n garbage layers into the opponent's
- *      well, each with one cell missing at a random column.
- *   b) Same-hole: the missing cell stays in the same column for consecutive
- *      attacks, so stringing clears together builds the opponent a shaft rather
- *      than a random mess.
- *
- * (b) rewards repeat clears and makes the well readable; (a) is what players
- * already expect. Wire whichever is chosen in here — `victim.grid` is the only
- * thing it needs to touch, and `Grid` already owns the layer shifting that
- * pushing garbage up requires.
+ * The hit does not land immediately — Game holds it until the victim's current
+ * piece settles, so the stack never lifts out from under a piece in flight.
+ * Every layer in one hit shares a hole column, so a big attack digs a shaft
+ * instead of scattering gaps.
  */
-function sendAttack(_attacker: Game, _victim: Game, _layers: number): void {
-  /* undecided — see above */
+function sendAttack(attacker: Game, victim: Game, layers: number): void {
+  victim.receiveGarbage(layers);
+  renderer.hud.flashAttack(attacker === p1 ? 0 : 1, layers);
 }
 
 function startRound(): void {
@@ -67,6 +60,7 @@ function startRound(): void {
   overSince = 0;
   feed.reset(); // once per round, before the players rewind their cursors
   for (const g of players) g.reset();
+  renderer.hud.clearFlashes();
   startCard.classList.remove("show");
   banner.classList.remove("show");
   phase = "playing";
@@ -89,6 +83,7 @@ function toStartCard(): void {
   startCard.classList.add("show");
   feed.reset();
   for (const g of players) g.reset();
+  renderer.hud.clearFlashes();
   draw();
 }
 
@@ -101,6 +96,12 @@ for (const me of players) {
   me.onClear = (n) => {
     sfx.clear(n);
     sendAttack(me, other, n);
+  };
+  // Fires when the queued layers actually lift this player's stack.
+  me.onGarbageRise = (n) => {
+    renderer.hud.flashHit(me === p1 ? 0 : 1, n);
+    sfx.lock();
+    draw();
   };
   me.onGameOver = () => endRound(me);
 }

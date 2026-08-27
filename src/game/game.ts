@@ -1,5 +1,6 @@
 import {
   BASE_DROP_MS,
+  GARBAGE_COLOR,
   LAYERS_PER_LEVEL,
   LAYER_SCORE,
   LEVEL_SPEEDUP_MS,
@@ -45,6 +46,16 @@ export class Game {
 
   private dropTimer = 0;
 
+  /**
+   * Attacks waiting to be applied.
+   *
+   * Garbage cannot rise the instant it is earned: the piece this player is
+   * holding is mid-flight, and lifting the stack under it would leave it
+   * intersecting blocks it never touched. Everything here is applied at the
+   * moment that piece locks, before the next one spawns.
+   */
+  private pendingGarbage: { lines: number; holeX: number; holeZ: number }[] = [];
+
   /** Fired whenever the visible state changes (renderer redraws). */
   onChange: (() => void) | null = null;
   /** Fired when n>0 layers clear (for sound/juice). */
@@ -57,6 +68,10 @@ export class Game {
   onRotate: (() => void) | null = null;
   /** Fired when a piece settles into the stack (for sound). */
   onLock: (() => void) | null = null;
+  /** Fired when garbage is queued against this player, before it rises. */
+  onGarbageQueued: ((lines: number) => void) | null = null;
+  /** Fired when queued garbage actually lifts the stack. */
+  onGarbageRise: ((lines: number) => void) | null = null;
 
   /**
    * Both players are handed the same PieceFeed and keep their own cursor into
@@ -162,7 +177,41 @@ export class Game {
       this.level = 1 + Math.floor(this.layers / LAYERS_PER_LEVEL);
       this.onClear?.(n);
     }
+    // After the clear so a player is not handed layers they just removed, and
+    // before the spawn so the new piece is checked against the raised stack.
+    this.applyPendingGarbage();
     this.spawn();
+  }
+
+  /** Total layers queued against this player and not yet risen. */
+  get incomingGarbage(): number {
+    return this.pendingGarbage.reduce((n, g) => n + g.lines, 0);
+  }
+
+  /**
+   * Take a hit of `lines` layers. The hole column is rolled once here and
+   * shared by every layer in this hit, so a four-line attack is a four-deep
+   * shaft rather than four unrelated gaps.
+   */
+  receiveGarbage(lines: number): void {
+    if (lines <= 0 || this.gameOver) return;
+    this.pendingGarbage.push({
+      lines,
+      holeX: Math.floor(Math.random() * w),
+      holeZ: Math.floor(Math.random() * d),
+    });
+    this.onGarbageQueued?.(lines);
+  }
+
+  private applyPendingGarbage(): void {
+    if (this.pendingGarbage.length === 0) return;
+    let total = 0;
+    for (const g of this.pendingGarbage) {
+      this.grid.riseGarbage(g.lines, g.holeX, g.holeZ, GARBAGE_COLOR);
+      total += g.lines;
+    }
+    this.pendingGarbage.length = 0;
+    this.onGarbageRise?.(total);
   }
 
   // Landing position of the current piece (for the ghost preview).
@@ -188,6 +237,7 @@ export class Game {
     this.level = 1;
     this.layers = 0;
     this.gameOver = false;
+    this.pendingGarbage.length = 0;
     // The feed is shared and is reset once per round by the caller, not here.
     this.cursor = 0;
     this.next = this.feed.at(this.cursor++);

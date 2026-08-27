@@ -30,12 +30,78 @@ export class Hud {
   private readonly scores: TextBlock[] = [];
   /** [player][layerIndex] — layer 0 is the floor. */
   private readonly fills: Rectangle[][] = [[], []];
+  private readonly flashes: TextBlock[] = [];
+  private readonly flashTimers: (number | null)[] = [null, null];
 
   constructor(ui: AdvancedDynamicTexture) {
     this.scores.push(this.buildScore(ui, "1P", -25));
     this.scores.push(this.buildScore(ui, "2P", 25));
     this.buildGauge(ui, 0, -1);
     this.buildGauge(ui, 1, 1);
+    this.flashes.push(this.buildFlash(ui, "1P", -25));
+    this.flashes.push(this.buildFlash(ui, "2P", 25));
+  }
+
+  /**
+   * The banner that says an attack just landed.
+   *
+   * Without it a player watching their own well simply sees the stack jump, and
+   * reads it as the game glitching rather than as the other player hitting
+   * them. It sits on the attacker's half, because the reason to show it at all
+   * is to make a good clear feel like it did something to someone.
+   */
+  private buildFlash(
+    ui: AdvancedDynamicTexture,
+    label: string,
+    offsetPct: number
+  ): TextBlock {
+    const t = new TextBlock(`${label}_flash`, "");
+    t.color = "#ffd166";
+    t.fontSize = 34;
+    t.fontFamily = FONT;
+    t.fontWeight = "800";
+    t.outlineColor = "#1a1207";
+    t.outlineWidth = 5;
+    t.height = "44px";
+    t.left = `${offsetPct}%`;
+    t.top = "-22%";
+    t.alpha = 0;
+    t.isVisible = true;
+    ui.addControl(t);
+    return t;
+  }
+
+  /** Show `공격 +n줄` on the attacker's half for a beat. */
+  flashAttack(player: 0 | 1, lines: number): void {
+    this.showFlash(player, `공격  +${lines}줄`, "#ffd166");
+  }
+
+  /** Show the hit on the receiving half, so both sides see the same event. */
+  flashHit(player: 0 | 1, lines: number): void {
+    this.showFlash(player, `피격  +${lines}줄`, "#ff7b7b");
+  }
+
+  private showFlash(player: 0 | 1, text: string, color: string): void {
+    const t = this.flashes[player];
+    t.text = text;
+    t.color = color;
+    t.alpha = 1;
+    const prev = this.flashTimers[player];
+    if (prev !== null) window.clearTimeout(prev);
+    this.flashTimers[player] = window.setTimeout(() => {
+      t.alpha = 0;
+      this.flashTimers[player] = null;
+    }, 1100);
+  }
+
+  /** Clear any banner still on screen, so a new round starts clean. */
+  clearFlashes(): void {
+    for (let i = 0; i < this.flashes.length; i++) {
+      this.flashes[i].alpha = 0;
+      const timer = this.flashTimers[i];
+      if (timer !== null) window.clearTimeout(timer);
+      this.flashTimers[i] = null;
+    }
   }
 
   /** `offsetPct` is a shift from canvas centre, so -25 lands mid left-half. */

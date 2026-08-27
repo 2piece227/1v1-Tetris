@@ -58,6 +58,14 @@ export const LAYER_COLORS = [
   0xa83fd4, // 7 보
 ] as const;
 
+/**
+ * Stored on garbage cells. The renderer paints settled blocks by depth, not by
+ * what put them there, so this never reaches the screen — garbage takes the
+ * colour of whatever layer it ends up on, same as everything else. It exists so
+ * the grid holds a real value rather than a piece colour that would be a lie.
+ */
+export const GARBAGE_COLOR = 0x6b7280;
+
 /** Colour for a settled cell at grid height y, clamped for safety. */
 export function layerColor(y: number): number {
   return LAYER_COLORS[Math.min(Math.max(y, 0), LAYER_COLORS.length - 1)];

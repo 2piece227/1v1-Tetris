@@ -82,6 +82,48 @@ export class Grid {
       for (let x = 0; x < w; x++) this.cells[this.idx(x, h - 1, z)] = EMPTY;
   }
 
+  /**
+   * Push `n` garbage layers in at the floor, lifting the stack by n.
+   *
+   * Every inserted layer is left open at the same (holeX, holeZ). Rolling a
+   * fresh hole per layer turns a multi-line hit into a staircase that has to be
+   * unpicked one layer at a time; one shared column keeps a big attack punishing
+   * without being unfair to dig out of.
+   *
+   * Returns true if the lift pushed occupied cells past the ceiling, which the
+   * caller can treat as a loss — though the spawn check right after will catch
+   * it anyway once the well is full.
+   */
+  riseGarbage(n: number, holeX: number, holeZ: number, color: number): boolean {
+    if (n <= 0) return false;
+    const lift = Math.min(n, h);
+
+    // Anything currently sitting in the top `lift` layers is about to be pushed
+    // out, so test before the shift overwrites it.
+    let overflow = false;
+    for (let y = h - lift; y < h && !overflow; y++)
+      for (let z = 0; z < d && !overflow; z++)
+        for (let x = 0; x < w; x++)
+          if (this.isFilled(x, y, z)) {
+            overflow = true;
+            break;
+          }
+
+    // Top down, so a source cell is never clobbered before it is read.
+    for (let y = h - 1; y >= lift; y--)
+      for (let z = 0; z < d; z++)
+        for (let x = 0; x < w; x++)
+          this.cells[this.idx(x, y, z)] = this.get(x, y - lift, z);
+
+    for (let y = 0; y < lift; y++)
+      for (let z = 0; z < d; z++)
+        for (let x = 0; x < w; x++)
+          this.cells[this.idx(x, y, z)] =
+            x === holeX && z === holeZ ? EMPTY : color;
+
+    return overflow;
+  }
+
   reset(): void {
     this.cells.fill(EMPTY);
   }
