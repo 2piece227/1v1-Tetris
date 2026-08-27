@@ -1,53 +1,76 @@
 import { PieceDef, TIERS, tierIndexFor } from "./pieces";
 
 /**
- * Tetris-style bag randomiser, with the bag's contents driven by score.
+ * One shuffled piece sequence, shared by both players.
  *
- * A bag deals one of every piece in a shuffled order before any piece repeats,
- * which is what stops a booth player from getting four screws in a row and
- * concluding the game is broken. Plain random sampling has no such guarantee.
+ * Versus has to be fair, and fair means neither player can lose to a worse
+ * draw. So there is a single sequence and each player holds their own cursor
+ * into it: both see exactly the same pieces in the same order, each at their
+ * own pace. Giving the two sides separate bags — even seeded identically —
+ * does not achieve this, because the two players consume randomness at
+ * different rates as soon as anything about their games differs.
  *
- * The composition escalates through TIERS as the score climbs. Crossing a
- * threshold discards whatever is left of the current bag so the newly unlocked
- * pieces show up immediately rather than up to a bag later — at 100 points the
- * point is to *feel* the corner piece disappear.
+ * Position `i` is generated once and cached, so whoever reaches it first fixes
+ * it for both. The player who is ahead therefore decides which difficulty tier
+ * the deeper part of the sequence was built under, and the player behind then
+ * receives those same pieces when they get there.
  *
- * Note on the top tier: a layer of the 4x4 well is 16 cells, and 16 cannot be
- * made from fives and fours other than as four fours. Once pentominoes are in
- * the bag, clearing a layer generally means orienting pieces so they straddle
- * layers. That is intended to be hard, but it is a real cliff at 1000 points.
+ * Within a tier this is a standard bag: every piece is dealt once, in shuffled
+ * order, before any repeats. Plain random sampling would let a booth player
+ * draw four screws running and conclude the game is broken.
  */
-export class Bag {
+export class PieceFeed {
+  private seq: PieceDef[] = [];
   private queue: PieceDef[] = [];
   private tier = -1;
 
-  constructor(private readonly rand: () => number = Math.random) {}
+  /**
+   * `difficultyScore` is the single score the tier is read from — with one
+   * shared sequence there can only be one, so a versus round escalates for
+   * both players at once rather than per-player.
+   */
+  constructor(
+    private readonly difficultyScore: () => number,
+    private readonly rand: () => number = Math.random
+  ) {}
 
-  /** The tier the bag is currently dealing from. */
   get tierIndex(): number {
-    return this.tier;
+    return Math.max(0, this.tier);
   }
 
-  /** Draw the next piece for the given score, refilling and re-tiering as needed. */
-  take(score: number): PieceDef {
-    const tier = tierIndexFor(score);
+  get tierLabel(): string {
+    return TIERS[this.tierIndex].label;
+  }
+
+  /** The piece at position `i` of the shared sequence, generating as needed. */
+  at(i: number): PieceDef {
+    while (this.seq.length <= i) this.extend();
+    return this.seq[i];
+  }
+
+  /** Start a fresh sequence. Call once per round, not once per player. */
+  reset(): void {
+    this.seq.length = 0;
+    this.queue.length = 0;
+    this.tier = -1;
+  }
+
+  private extend(): void {
+    const tier = tierIndexFor(this.difficultyScore());
     if (tier !== this.tier) {
+      // Crossing a threshold drops the rest of the current bag so the newly
+      // unlocked pieces appear right away rather than up to a bag later.
       this.tier = tier;
       this.queue.length = 0;
     }
     if (this.queue.length === 0) this.refill();
-    return this.queue.pop()!;
-  }
-
-  reset(): void {
-    this.tier = -1;
-    this.queue.length = 0;
+    this.seq.push(this.queue.pop()!);
   }
 
   private refill(): void {
     this.queue = [...TIERS[this.tier].pieces];
-    // Fisher-Yates. Dealing with pop() means the shuffle order is consumed from
-    // the end, which is fine — every permutation is equally likely either way.
+    // Fisher-Yates. Dealing with pop() consumes the shuffle from the end, which
+    // is fine — every permutation is equally likely either way.
     for (let i = this.queue.length - 1; i > 0; i--) {
       const j = Math.floor(this.rand() * (i + 1));
       [this.queue[i], this.queue[j]] = [this.queue[j], this.queue[i]];

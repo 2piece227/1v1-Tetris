@@ -85,11 +85,17 @@ export interface Tier {
 
 const CORE = [I, O, T, L, S];
 
+// Versus starts where the single-player build's second tier did: no three-cell
+// corner to ease anyone in, and the branch already in the bag. A cabinet round
+// is short and both players are watching each other, so the gentle opening had
+// nothing to do. The pentomino tier is gone entirely — five-cell pieces cannot
+// tile a 16-cell layer alongside fours, and handing that to a player who is
+// already losing just ends the round without a contest.
+//
+// CORNER and PENTOMINOES stay defined in this file but are no longer dealt.
 export const TIERS: Tier[] = [
-  { minScore: 0, label: "입문", pieces: [...CORE, CORNER] },
-  { minScore: 100, label: "가지", pieces: [...CORE, B] },
+  { minScore: 0, label: "기본", pieces: [...CORE, B] },
   { minScore: 500, label: "나사", pieces: [...CORE, B, D, F] },
-  { minScore: 1000, label: "펜토미노", pieces: [...CORE, B, D, F, ...PENTOMINOES] },
 ];
 
 /** Index into TIERS for a given score. */

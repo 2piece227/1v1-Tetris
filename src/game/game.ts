@@ -6,9 +6,9 @@ import {
   MIN_DROP_MS,
   WELL,
 } from "../config";
-import { Bag } from "./bag";
+import { PieceFeed } from "./bag";
 import { Grid } from "./grid";
-import { PieceDef, TIERS } from "./pieces";
+import { PieceDef } from "./pieces";
 import { Axis, IVec3, rotate } from "./vec";
 
 const { w, d, h } = WELL;
@@ -31,7 +31,7 @@ const KICKS: IVec3[] = [
 export class Game {
   readonly grid = new Grid();
 
-  readonly bag: Bag;
+  private cursor = 0;
 
   current!: PieceDef;
   cells!: IVec3[]; // current rotated offsets
@@ -59,17 +59,11 @@ export class Game {
   onLock: (() => void) | null = null;
 
   /**
-   * `rand` is injectable so a round can be replayed, and so both cabinets could
-   * later run off one seeded stream. Note that seeding both players identically
-   * does NOT by itself hand them the same pieces: bag composition is
-   * score-driven, the two scores diverge, and from the first tier change on the
-   * two streams are consumed at different rates. Making versus truly fair needs
-   * a shared sequence, which in turn needs the tier trigger to stop depending
-   * on per-player score.
+   * Both players are handed the same PieceFeed and keep their own cursor into
+   * it, so the two sides see an identical piece sequence at their own pace.
    */
-  constructor(rand: () => number = Math.random) {
-    this.bag = new Bag(rand);
-    this.next = this.bag.take(0);
+  constructor(private readonly feed: PieceFeed) {
+    this.next = this.feed.at(this.cursor++);
     this.spawn();
   }
 
@@ -77,14 +71,14 @@ export class Game {
     return Math.max(MIN_DROP_MS, BASE_DROP_MS - (this.level - 1) * LEVEL_SPEEDUP_MS);
   }
 
-  /** Label of the bag composition currently in play, for the HUD. */
+  /** Label of the bag composition in play. Shared, so both players see one. */
   get tierLabel(): string {
-    return TIERS[Math.max(0, this.bag.tierIndex)].label;
+    return this.feed.tierLabel;
   }
 
   private spawn(): void {
     this.current = this.next;
-    this.next = this.bag.take(this.score);
+    this.next = this.feed.at(this.cursor++);
     this.cells = this.current.cells.map((c) => ({ ...c }));
 
     // Centre the piece's own bounding box in the well rather than parking the
@@ -194,8 +188,9 @@ export class Game {
     this.level = 1;
     this.layers = 0;
     this.gameOver = false;
-    this.bag.reset();
-    this.next = this.bag.take(0);
+    // The feed is shared and is reset once per round by the caller, not here.
+    this.cursor = 0;
+    this.next = this.feed.at(this.cursor++);
     this.spawn();
   }
 }

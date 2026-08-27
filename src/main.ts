@@ -1,4 +1,5 @@
 import { Sfx } from "./audio/sfx";
+import { PieceFeed } from "./game/bag";
 import { Game } from "./game/game";
 import { attachKeyboard } from "./input/keyboard";
 import { Renderer } from "./render/renderer";
@@ -11,9 +12,17 @@ const bannerText = document.getElementById("bannerText") as HTMLElement;
 const renderer = new Renderer(canvas);
 const sfx = new Sfx();
 
-const p1 = new Game();
-const p2 = new Game();
-const players = [p1, p2];
+// One sequence, two cursors: both players are dealt identical pieces in
+// identical order. `players` is filled after construction on purpose — the feed
+// reads scores through it, and during construction it is empty and reports 0,
+// which is what both scores are at that point anyway.
+const players: Game[] = [];
+const feed = new PieceFeed(() =>
+  players.reduce((best, g) => Math.max(best, g.score), 0)
+);
+const p1 = new Game(feed);
+const p2 = new Game(feed);
+players.push(p1, p2);
 
 /** ready: start card up · playing: live · over: win card up */
 type Phase = "ready" | "playing" | "over";
@@ -56,6 +65,7 @@ function sendAttack(_attacker: Game, _victim: Game, _layers: number): void {
 function startRound(): void {
   if (phase === "playing") return;
   overSince = 0;
+  feed.reset(); // once per round, before the players rewind their cursors
   for (const g of players) g.reset();
   startCard.classList.remove("show");
   banner.classList.remove("show");
@@ -77,6 +87,7 @@ function toStartCard(): void {
   phase = "ready";
   banner.classList.remove("show");
   startCard.classList.add("show");
+  feed.reset();
   for (const g of players) g.reset();
   draw();
 }
