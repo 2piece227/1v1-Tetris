@@ -5,7 +5,7 @@
 
 // Ten layers rather than the VR build's eighteen. A versus round wants to be
 // decided in a minute or two, and a shallow well is what forces that.
-export const WELL = { w: 4, d: 4, h: 18 } as const;
+export const WELL = { w: 4, d: 4, h: 12 } as const;
 
 // One cell in Babylon world units. Arbitrary here — unlike the VR build these
 // are not metres, they only have to be consistent with the camera framing.
