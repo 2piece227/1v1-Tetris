@@ -31,13 +31,14 @@ chrome.exe --app=http://localhost:5174 --start-fullscreen
 
 ## 조작
 
-아케이드 패널 기준으로 **4방향 스틱 + 버튼 4개 = 8개 입력**만 쓴다.
-회전은 축마다 버튼 하나로 한 방향씩만 돈다(4번 누르면 제자리).
+아케이드 패널 기준으로 **4방향 스틱 + 버튼 7개 = 11개 입력**을 쓴다.
+축마다 양방향 버튼이 있어서 짧은 쪽으로 돌릴 수 있다.
 
 | | 1P | 2P |
 |---|---|---|
 | 이동 | <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> | 방향키 |
 | 회전 X / Y / Z | <kbd>Q</kbd> <kbd>E</kbd> <kbd>R</kbd> | <kbd>U</kbd> <kbd>I</kbd> <kbd>O</kbd> |
+| 반대 회전 X / Y / Z | <kbd>Z</kbd> <kbd>C</kbd> <kbd>V</kbd> | <kbd>J</kbd> <kbd>K</kbd> <kbd>L</kbd> |
 | 하드 드롭 | <kbd>Space</kbd> | <kbd>Enter</kbd> |
 | 시작 / 재시작 | <kbd>Space</kbd> 또는 <kbd>Enter</kbd> | |
 

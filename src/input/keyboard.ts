@@ -5,11 +5,13 @@ import type { Game } from "../game/game";
  * Two players on one keyboard.
  *
  * The layout assumes a cabinet panel per player: a four-way stick for movement
- * plus four buttons. That is eight inputs, which fits a standard arcade panel —
- * the VR build's six rotation directions would not. Each axis therefore gets a
- * single button that always turns the same way; press it four times to come
- * back round. A USB arcade encoder presents itself as a keyboard, so these are
- * the codes to map the panel to.
+ * plus seven buttons — both directions on each of the three axes, and hard
+ * drop. Eleven inputs per player, so the panel needs seven buttons a side.
+ *
+ * Each axis previously had one button and you came back round by pressing it
+ * four times. With a stick being wired up there are buttons to spare, and
+ * turning the short way is worth one of them. A USB arcade encoder presents
+ * itself as a keyboard, so these are the codes to map the panel to.
  *
  * Bindings are keyed off `event.code`, not `event.key`: a physical panel button
  * should not change meaning if the machine boots with a different keyboard
@@ -23,6 +25,10 @@ interface Binding {
   rotX: string;
   rotY: string;
   rotZ: string;
+  /** Same axis, opposite way round. */
+  rotXBack: string;
+  rotYBack: string;
+  rotZBack: string;
   hardDrop: string;
 }
 
@@ -34,6 +40,9 @@ export const P1_KEYS: Binding = {
   rotX: "KeyQ",
   rotY: "KeyE",
   rotZ: "KeyR",
+  rotXBack: "KeyZ",
+  rotYBack: "KeyC",
+  rotZBack: "KeyV",
   hardDrop: "Space",
 };
 
@@ -45,6 +54,9 @@ export const P2_KEYS: Binding = {
   rotX: "KeyU",
   rotY: "KeyI",
   rotZ: "KeyO",
+  rotXBack: "KeyJ",
+  rotYBack: "KeyK",
+  rotZBack: "KeyL",
   hardDrop: "Enter",
 };
 
@@ -69,6 +81,9 @@ function bind(game: Game, keys: Binding, sfx: Sfx, enabled: () => boolean): void
       case keys.rotX: game.tryRotate("x", 1); break;
       case keys.rotY: game.tryRotate("y", 1); break;
       case keys.rotZ: game.tryRotate("z", 1); break;
+      case keys.rotXBack: game.tryRotate("x", -1); break;
+      case keys.rotYBack: game.tryRotate("y", -1); break;
+      case keys.rotZBack: game.tryRotate("z", -1); break;
       case keys.hardDrop: game.hardDrop(); break;
       default: used = false;
     }
