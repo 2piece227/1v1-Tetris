@@ -5,7 +5,7 @@
 
 // Ten layers rather than the VR build's eighteen. A versus round wants to be
 // decided in a minute or two, and a shallow well is what forces that.
-export const WELL = { w: 4, d: 4, h: 7 } as const;
+export const WELL = { w: 4, d: 4, h: 18 } as const;
 
 // One cell in Babylon world units. Arbitrary here — unlike the VR build these
 // are not metres, they only have to be consistent with the camera framing.
@@ -66,7 +66,31 @@ export const LAYER_COLORS = [
  */
 export const GARBAGE_COLOR = 0x6b7280;
 
-/** Colour for a settled cell at grid height y, clamped for safety. */
+/**
+ * Colour for a settled cell at grid height y.
+ *
+ * The list above is a ramp of anchor points rather than one entry per layer, so
+ * the well can be any depth and every layer still gets its own shade. Indexing
+ * the list directly only worked while the well happened to be exactly as deep
+ * as the list is long; any deeper and everything above the last anchor clamped
+ * to the same violet, which is precisely the depth cue this is here to provide.
+ *
+ * At a seven-layer well this returns the seven anchors exactly, so the tuning
+ * baked into them is preserved.
+ */
 export function layerColor(y: number): number {
-  return LAYER_COLORS[Math.min(Math.max(y, 0), LAYER_COLORS.length - 1)];
+  const top = WELL.h - 1;
+  const t = top <= 0 ? 0 : Math.min(Math.max(y, 0), top) / top;
+  const pos = t * (LAYER_COLORS.length - 1);
+  const i = Math.min(Math.floor(pos), LAYER_COLORS.length - 2);
+  const f = pos - i;
+
+  const a = LAYER_COLORS[i];
+  const b = LAYER_COLORS[i + 1];
+  const mix = (shift: number): number => {
+    const ca = (a >> shift) & 0xff;
+    const cb = (b >> shift) & 0xff;
+    return Math.round(ca + (cb - ca) * f);
+  };
+  return (mix(16) << 16) | (mix(8) << 8) | mix(0);
 }

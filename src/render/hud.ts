@@ -1,5 +1,5 @@
 import { AdvancedDynamicTexture, Control, Rectangle, TextBlock } from "@babylonjs/gui";
-import { LAYER_COLORS, WELL } from "../config";
+import { WELL, layerColor } from "../config";
 import { Grid } from "../game/grid";
 import type { Game } from "../game/game";
 
@@ -158,7 +158,11 @@ export class Hud {
       fill.width = "100%";
       fill.height = "100%";
       fill.thickness = 0;
-      fill.background = hex(LAYER_COLORS[layer]);
+      // Through layerColor, not the anchor list: the list is a ramp with fewer
+      // entries than the well has layers, so indexing it directly read
+      // undefined past the last anchor and threw out of the constructor —
+      // taking the whole HUD, and with it the round, down with it.
+      fill.background = hex(layerColor(layer));
       fill.alpha = 0;
       slot.addControl(fill);
       this.fills[player].push(fill);
